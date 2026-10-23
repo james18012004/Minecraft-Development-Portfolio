@@ -1,0 +1,1799 @@
+# ============================================================
+# NODE BOXPVP - PHYSICAL CRATES SYSTEM
+# Version 18 - Higher Cosmetic Odds + Full Tag Colour Previews
+#
+# Paper 1.21.11
+# Skript 2.15.3
+# SkBee
+# Vault / EssentialsX Economy
+#
+# Crates:
+#   Rift
+#   Vortex
+#   Ascendant
+#   Sovereign
+#   Multiplier
+#   KOTH
+#
+# IMPORTANT:
+# - This system does NOT reward stage mining resources.
+# - Money rewards are fixed crate rewards and are NOT multiplied.
+# - Box XP is granted through /giveboxxp so it uses the existing
+#   Node BoxPvP Level / Prestige system.
+# - Multiplier rewards use the existing BoxMultiplierSystem helpers:
+#       boxGiveMoneyMultiplier(player, multiplier, seconds)
+#       boxGiveXpMultiplier(player, multiplier, seconds)
+#       boxGiveSkillMultiplier(player, multiplier, seconds)
+#
+# SETUP:
+#   1. Look at the physical block you want to turn into a crate.
+#      Every configured crate becomes a Beacon.
+#   2. /crateadmin set rift
+#   3. Repeat for each crate.
+#   4. Stand in the crate area and /crateadmin setwarp
+#
+# PLAYERS:
+#   /crates                 - Teleports directly to crate area
+#   /cratemenu              - Opens crate browser / preview GUI
+#   /cratepreview <crate>
+#
+# STAFF:
+#   /cratekey <player> <crate> <amount>
+#   /cratekeyall <crate> <amount>
+#   /crateadmin set <crate>
+#   /crateadmin remove <crate>
+#   /crateadmin setwarp
+#   /crateadmin refreshholograms
+#   /crateadmin cleanupholograms
+# ============================================================
+
+options:
+    crates-prefix: &6&lCRATES &8»
+    crates-menu-title: &5&l✦ NODE CRATES ✦
+
+# ============================================================
+# BASIC HELPERS
+# ============================================================
+
+function nodeCrateType(raw: text) :: text:
+    set {_t} to lowercase {_raw}
+
+    if {_t} is "rift":
+        return "rift"
+    if {_t} is "vortex":
+        return "vortex"
+    if {_t} is "ascendant":
+        return "ascendant"
+    if {_t} is "sovereign":
+        return "sovereign"
+    if {_t} is "multiplier":
+        return "multiplier"
+    if {_t} is "multipliers":
+        return "multiplier"
+    if {_t} is "koth":
+        return "koth"
+
+    return "invalid"
+
+function nodeCrateDisplay(crate: text) :: text:
+    if {_crate} is "rift":
+        return "<##7C3AED>&lR<##8640EF>&lI<##9145F2>&lF<##9C4AF5>&lT <##A855F7>&lCRATE"
+    if {_crate} is "vortex":
+        return "<##06B6D4>&lV<##0CB4DF>&lO<##12B2E9>&lR<##1EAEF2>&lT<##2BA9FA>&lE<##38A3FF>&lX <##4D9CFF>&lCRATE"
+    if {_crate} is "ascendant":
+        return "<##67E8F9>&lA<##76E9F7>&lS<##85EAF4>&lC<##94EBF1>&lE<##A3ECEE>&lN<##B2EDEB>&lD<##C1EEE8>&lA<##D0EFE5>&lN<##DFF0E2>&lT <##EEF2FF>&lCRATE"
+    if {_crate} is "sovereign":
+        return "<##F59E0B>&lS<##F7A817>&lO<##F8B224>&lV<##F9BC30>&lE<##FBC63C>&lR<##FCD048>&lE<##FDD954>&lI<##FEE260>&lG<##FFEA6C>&lN <##FFF3A3>&lCRATE"
+    if {_crate} is "multiplier":
+        return "<##C026D3>&lM<##C936DC>&lU<##D246E5>&lL<##DB56EE>&lT<##E466F7>&lI<##E976F7>&lP<##E986EF>&lL<##E996E7>&lI<##E9A6DF>&lE<##E9B6D7>&lR <##67E8F9>&lCRATE"
+    if {_crate} is "koth":
+        return "<##EF4444>&lK<##F1533D>&lO<##F36236>&lT<##F5712F>&lH <##F59E0B>&lCRATE"
+    return "&7&lUNKNOWN CRATE"
+
+function nodeCrateShortColour(crate: text) :: text:
+    if {_crate} is "rift":
+        return "&5"
+    if {_crate} is "vortex":
+        return "&3"
+    if {_crate} is "ascendant":
+        return "&b"
+    if {_crate} is "sovereign":
+        return "&6"
+    if {_crate} is "multiplier":
+        return "&d"
+    if {_crate} is "koth":
+        return "&c"
+    return "&7"
+
+function nodeCrateKey(crate: text) :: item:
+    set {_display} to nodeCrateDisplay({_crate})
+    set {_key} to tripwire hook named "%{_display}% &fKey"
+    set lore of {_key} to "&8Node BoxPvP Crate Key", "", "&7Use this key at the", "%{_display}%&7.", "", "&eRight-click the physical crate", "&eto open it."
+    return {_key}
+
+function nodeCrateHasKey(p: player, crate: text) :: boolean:
+    set {_key} to nodeCrateKey({_crate})
+    if {_p}'s inventory contains {_key}:
+        return true
+    return false
+
+function nodeCrateTakeKey(p: player, crate: text):
+    set {_key} to nodeCrateKey({_crate})
+    remove 1 of {_key} from {_p}'s inventory
+
+function nodeCrateGiveKey(p: player, crate: text, amount: number):
+    set {_key} to nodeCrateKey({_crate})
+    give {_amount} of {_key} to {_p}
+
+function nodeCrateGiveMoney(p: player, amount: number):
+    add {_amount} to balance of {_p}
+
+function nodeCrateGiveBoxXp(p: player, amount: number):
+    execute console command "giveboxxp %{_p}% %{_amount}%"
+
+# ============================================================
+# CRATE COSMETIC REWARD HELPER
+# Uses the existing Cosmetics LuckPerms permissions.
+# Duplicate cosmetic rolls become cash instead.
+# ============================================================
+
+function nodeCrateGiveCosmetic(p: player, perm: text, display: text, fallback: number) :: text:
+    if {_p} has permission "%{_perm}%":
+        nodeCrateGiveMoney({_p}, {_fallback})
+        send "{@crates-prefix} &7You already own %{_display}%&7, so you received &a$%{_fallback}% &7instead." to {_p}
+        return "&a$%{_fallback}% &7(&dDuplicate Cosmetic&7)"
+
+    set {_u} to uuid of {_p}
+    execute console command "lp user %{_u}% permission set %{_perm}% true"
+    send "" to {_p}
+    send "&d&l✦ COSMETIC UNLOCKED ✦" to {_p}
+    send "&7You permanently unlocked %{_display}%&7!" to {_p}
+    send "&7Equip it from &f/cosmetics&7." to {_p}
+    send "" to {_p}
+    send action bar "&dCOSMETIC UNLOCKED &8• %{_display}%" to {_p}
+    play sound "ui.toast.challenge_complete" with volume 1 and pitch 1.2 to {_p}
+    return "%{_display}%"
+
+function nodeCrateBroadcastTop(p: player, crate: text, reward: text):
+    set {_crateDisplay} to nodeCrateDisplay({_crate})
+    broadcast "&6&l✦ CRATE JACKPOT ✦ &8» &f%{_p}% &7won %{_reward}% &7from %{_crateDisplay}%&7!"
+
+function nodeCratePersonalReward(p: player, crate: text, reward: text):
+    set {_crateDisplay} to nodeCrateDisplay({_crate})
+    send "{@crates-prefix} &7You opened %{_crateDisplay}% &7and won %{_reward}%&7!" to {_p}
+    send action bar "&6CRATE REWARD &8• %{_reward}%" to {_p}
+
+function nodeCrateFirework(p: player, crate: text, jackpot: boolean):
+    if {_crate} is "rift":
+        launch flickering trailing burst firework colored purple and white at {_p}'s location with duration 1
+    if {_crate} is "vortex":
+        launch flickering trailing burst firework colored aqua and blue at {_p}'s location with duration 1
+    if {_crate} is "ascendant":
+        launch flickering trailing star firework colored aqua and white at {_p}'s location with duration 1
+    if {_crate} is "sovereign":
+        launch flickering trailing star firework colored yellow and white at {_p}'s location with duration 1
+    if {_crate} is "multiplier":
+        launch flickering trailing burst firework colored purple and aqua at {_p}'s location with duration 1
+    if {_crate} is "koth":
+        launch flickering trailing burst firework colored red and yellow at {_p}'s location with duration 1
+
+    if {_jackpot} is true:
+        wait 5 ticks
+        if {_crate} is "rift":
+            launch trailing ball firework colored purple at {_p}'s location with duration 1
+        if {_crate} is "vortex":
+            launch trailing ball firework colored blue at {_p}'s location with duration 1
+        if {_crate} is "ascendant":
+            launch trailing star firework colored aqua at {_p}'s location with duration 1
+        if {_crate} is "sovereign":
+            launch trailing star firework colored yellow at {_p}'s location with duration 1
+        if {_crate} is "multiplier":
+            launch trailing burst firework colored purple and pink at {_p}'s location with duration 1
+        if {_crate} is "koth":
+            launch trailing star firework colored red and yellow at {_p}'s location with duration 1
+
+
+function nodeCrateGiveWarBow(p: player):
+    set {_bow} to bow named "&c&lNODE WAR BOW"
+    enchant {_bow} with power 5
+    enchant {_bow} with unbreaking 3
+    enchant {_bow} with punch 2
+    enchant {_bow} with flame 1
+    set lore of {_bow} to "&8Crate PvP Reward", "", "&7Power V", "&7Unbreaking III", "&7Punch II", "&7Flame I"
+    give {_bow} to {_p}
+
+function nodeCrateGiveFlightPack(p: player, rockets: number):
+    give 1 elytra to {_p}
+    give {_rockets} of firework rocket to {_p}
+
+# ============================================================
+# HOLOGRAMS
+# ============================================================
+
+function nodeCrateClearHologram(crate: text):
+    loop {nodecrate::hologram::%{_crate}%::*}:
+        if loop-value is set:
+            kill loop-value
+
+    if {nodecrate::location::%{_crate}%} is set:
+        set {_loc} to {nodecrate::location::%{_crate}%}
+        execute console command "execute positioned %x-coordinate of {_loc}% %y-coordinate of {_loc}% %z-coordinate of {_loc}% run kill @e[type=minecraft:armor_stand,tag=nodecrate_hologram,distance=..4]"
+
+    delete {nodecrate::hologram::%{_crate}%::*}
+    delete {nodecrate::hologramtitle::%{_crate}%}
+
+function nodeCrateCleanupLegacyHolograms() :: number:
+    set {_removed} to 0
+
+    loop all entities:
+        if loop-entity is armor stand:
+            set {_rawName} to name of loop-entity
+
+            if {_rawName} is set:
+                set {_n} to uncolored {_rawName}
+                set {_remove} to false
+
+                if {_n} contains "RIFT":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                if {_n} contains "VORTEX":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                if {_n} contains "ASCENDANT":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                if {_n} contains "SOVEREIGN":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                if {_n} contains "MULTIPLIER":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                if {_n} contains "KOTH":
+                    if {_n} contains "CRATE":
+                        set {_remove} to true
+
+                # Catch any old crate title once RGB/legacy colours are stripped.
+                if {_n} contains "CRATE":
+                    if {_n} contains "RIFT":
+                        set {_remove} to true
+                    if {_n} contains "VORTEX":
+                        set {_remove} to true
+                    if {_n} contains "ASCENDANT":
+                        set {_remove} to true
+                    if {_n} contains "SOVEREIGN":
+                        set {_remove} to true
+                    if {_n} contains "MULTIPLIER":
+                        set {_remove} to true
+                    if {_n} contains "KOTH":
+                        set {_remove} to true
+
+                if {_n} contains "RIGHT-CLICK":
+                    set {_remove} to true
+
+                if {_n} contains "SHIFT-RIGHT-CLICK":
+                    set {_remove} to true
+
+                if {_n} contains "★":
+                    set {_remove} to true
+
+                if {_remove} is true:
+                    kill loop-entity
+                    add 1 to {_removed}
+
+    execute console command "kill @e[type=minecraft:armor_stand,tag=nodecrate_hologram]"
+
+    delete {nodecrate::hologram::*}
+    delete {nodecrate::hologramtitle::*}
+
+    return {_removed}
+
+function nodeCrateSpawnHoloLine(crate: text, loc: location, text: text, titleLine: boolean):
+    spawn armor stand at {_loc}
+    set {_stand} to last spawned entity
+    set name of {_stand} to colored {_text}
+    execute console command "data merge entity %uuid of {_stand}% {Invisible:1b,Marker:1b,NoGravity:1b,CustomNameVisible:1b}"
+    execute console command "tag %uuid of {_stand}% add nodecrate_hologram"
+    add {_stand} to {nodecrate::hologram::%{_crate}%::*}
+
+    if {_titleLine} is true:
+        set {nodecrate::hologramtitle::%{_crate}%} to {_stand}
+
+function nodeCrateStars(crate: text) :: text:
+    if {_crate} is "rift":
+        return "&e★&8★★★★"
+    if {_crate} is "vortex":
+        return "&e★★&8★★★"
+    if {_crate} is "ascendant":
+        return "&e★★★&8★★"
+    if {_crate} is "sovereign":
+        return "&e★★★★&8★"
+    if {_crate} is "multiplier":
+        return "&d★★★★★"
+    if {_crate} is "koth":
+        return "&6★★★★★"
+    return "&8★★★★★"
+
+function nodeCrateRefreshHologram(crate: text):
+    nodeCrateClearHologram({_crate})
+
+    if {nodecrate::location::%{_crate}%} is not set:
+        stop
+
+    set {_base} to {nodecrate::location::%{_crate}%}
+
+    set {_line1} to {_base}
+    add 2.20 to y-coordinate of {_line1}
+    set {_line2} to {_base}
+    add 1.90 to y-coordinate of {_line2}
+    set {_line3} to {_base}
+    add 1.60 to y-coordinate of {_line3}
+    set {_line4} to {_base}
+    add 1.30 to y-coordinate of {_line4}
+
+    set {_display} to nodeCrateDisplay({_crate})
+    set {_stars} to nodeCrateStars({_crate})
+
+    nodeCrateSpawnHoloLine({_crate}, {_line1}, "%{_display}%", true)
+    nodeCrateSpawnHoloLine({_crate}, {_line2}, "%{_stars}%", false)
+    nodeCrateSpawnHoloLine({_crate}, {_line3}, "&f&lRIGHT-CLICK &8• &7Open Crate", false)
+    nodeCrateSpawnHoloLine({_crate}, {_line4}, "&e&lSHIFT-RIGHT-CLICK &8• &7Preview Rewards", false)
+
+function nodeCrateRefreshAllHolograms():
+    nodeCrateRefreshHologram("rift")
+    nodeCrateRefreshHologram("vortex")
+    nodeCrateRefreshHologram("ascendant")
+    nodeCrateRefreshHologram("sovereign")
+    nodeCrateRefreshHologram("multiplier")
+    nodeCrateRefreshHologram("koth")
+
+on load:
+    wait 20 ticks
+    nodeCrateRefreshAllHolograms()
+
+# ============================================================
+# PARTICLE ORBITS
+# Tight moving particles around each physical crate.
+# ============================================================
+
+function nodeCrateOrbit(crate: text):
+    if {nodecrate::location::%{_crate}%} is not set:
+        stop
+
+    set {_base} to {nodecrate::location::%{_crate}%}
+
+    if {nodecrate::particlephase} is not set:
+        set {nodecrate::particlephase} to 1
+
+    set {_phase} to {nodecrate::particlephase}
+
+    set {_a} to {_base}
+    set {_b} to {_base}
+    set {_c} to {_base}
+    set {_d} to {_base}
+
+    add 0.18 to y-coordinate of {_a}
+    add 0.18 to y-coordinate of {_b}
+    add 0.72 to y-coordinate of {_c}
+    add 0.72 to y-coordinate of {_d}
+
+    if {_phase} is 1:
+        add 0.70 to x-coordinate of {_a}
+        remove 0.70 from x-coordinate of {_b}
+        add 0.70 to z-coordinate of {_c}
+        remove 0.70 from z-coordinate of {_d}
+
+    if {_phase} is 2:
+        add 0.50 to x-coordinate of {_a}
+        add 0.50 to z-coordinate of {_a}
+        remove 0.50 from x-coordinate of {_b}
+        remove 0.50 from z-coordinate of {_b}
+        remove 0.50 from x-coordinate of {_c}
+        add 0.50 to z-coordinate of {_c}
+        add 0.50 to x-coordinate of {_d}
+        remove 0.50 from z-coordinate of {_d}
+
+    if {_phase} is 3:
+        add 0.70 to z-coordinate of {_a}
+        remove 0.70 from z-coordinate of {_b}
+        remove 0.70 from x-coordinate of {_c}
+        add 0.70 to x-coordinate of {_d}
+
+    if {_phase} is 4:
+        remove 0.50 from x-coordinate of {_a}
+        add 0.50 to z-coordinate of {_a}
+        add 0.50 to x-coordinate of {_b}
+        remove 0.50 from z-coordinate of {_b}
+        remove 0.50 from x-coordinate of {_c}
+        remove 0.50 from z-coordinate of {_c}
+        add 0.50 to x-coordinate of {_d}
+        add 0.50 to z-coordinate of {_d}
+
+    if {_phase} is 5:
+        remove 0.70 from x-coordinate of {_a}
+        add 0.70 to x-coordinate of {_b}
+        remove 0.70 from z-coordinate of {_c}
+        add 0.70 to z-coordinate of {_d}
+
+    if {_phase} is 6:
+        remove 0.50 from x-coordinate of {_a}
+        remove 0.50 from z-coordinate of {_a}
+        add 0.50 to x-coordinate of {_b}
+        add 0.50 to z-coordinate of {_b}
+        add 0.50 to x-coordinate of {_c}
+        remove 0.50 from z-coordinate of {_c}
+        remove 0.50 from x-coordinate of {_d}
+        add 0.50 to z-coordinate of {_d}
+
+    if {_phase} is 7:
+        remove 0.70 from z-coordinate of {_a}
+        add 0.70 to z-coordinate of {_b}
+        add 0.70 to x-coordinate of {_c}
+        remove 0.70 from x-coordinate of {_d}
+
+    if {_phase} is 8:
+        add 0.50 to x-coordinate of {_a}
+        remove 0.50 from z-coordinate of {_a}
+        remove 0.50 from x-coordinate of {_b}
+        add 0.50 to z-coordinate of {_b}
+        add 0.50 to x-coordinate of {_c}
+        add 0.50 to z-coordinate of {_c}
+        remove 0.50 from x-coordinate of {_d}
+        remove 0.50 from z-coordinate of {_d}
+
+    loop all players:
+        if {_crate} is "rift":
+            draw 1 enchant particle at {_a} for loop-player
+            draw 1 enchant particle at {_b} for loop-player
+
+        if {_crate} is "vortex":
+            draw 1 electric spark particle at {_a} for loop-player
+            draw 1 electric spark particle at {_b} for loop-player
+            draw 1 electric spark particle at {_c} for loop-player
+
+        if {_crate} is "ascendant":
+            draw 1 wax on particle at {_a} for loop-player
+            draw 1 wax off particle at {_b} for loop-player
+            draw 1 wax on particle at {_c} for loop-player
+
+        if {_crate} is "sovereign":
+            draw 1 wax on particle at {_a} for loop-player
+            draw 1 wax on particle at {_b} for loop-player
+            draw 1 crit particle at {_c} for loop-player
+            draw 1 crit particle at {_d} for loop-player
+
+        if {_crate} is "multiplier":
+            draw 1 enchant particle at {_a} for loop-player
+            draw 1 electric spark particle at {_b} for loop-player
+            draw 1 wax on particle at {_c} for loop-player
+            draw 1 wax off particle at {_d} for loop-player
+
+        if {_crate} is "koth":
+            draw 2 crit particle at {_a} for loop-player
+            draw 2 crit particle at {_b} for loop-player
+            draw 1 electric spark particle at {_c} for loop-player
+            draw 1 electric spark particle at {_d} for loop-player
+
+every 5 ticks:
+    add 1 to {nodecrate::particlephase}
+    if {nodecrate::particlephase} > 8:
+        set {nodecrate::particlephase} to 1
+
+    nodeCrateOrbit("rift")
+    nodeCrateOrbit("vortex")
+    nodeCrateOrbit("ascendant")
+    nodeCrateOrbit("sovereign")
+    nodeCrateOrbit("multiplier")
+    nodeCrateOrbit("koth")
+
+
+# ============================================================
+# SPECIAL CRATE HOLOGRAM ANIMATION
+# Only Multiplier and KOTH animate.
+# ============================================================
+
+every 10 ticks:
+    add 1 to {nodecrate::textphase}
+    if {nodecrate::textphase} > 4:
+        set {nodecrate::textphase} to 1
+
+    if {nodecrate::hologramtitle::multiplier} is set:
+        set {_m} to {nodecrate::hologramtitle::multiplier}
+        if {_m} is alive:
+            if {nodecrate::textphase} is 1:
+                set name of {_m} to colored "<##C026D3>&lMULTIPLIER <##67E8F9>&lCRATE"
+            if {nodecrate::textphase} is 2:
+                set name of {_m} to colored "<##D946EF>&lMULTIPLIER <##38BDF8>&lCRATE"
+            if {nodecrate::textphase} is 3:
+                set name of {_m} to colored "<##A855F7>&lMULTIPLIER <##22D3EE>&lCRATE"
+            if {nodecrate::textphase} is 4:
+                set name of {_m} to colored "<##E879F9>&lMULTIPLIER <##7DD3FC>&lCRATE"
+
+    if {nodecrate::hologramtitle::koth} is set:
+        set {_k} to {nodecrate::hologramtitle::koth}
+        if {_k} is alive:
+            if {nodecrate::textphase} is 1:
+                set name of {_k} to colored "<##EF4444>&lKOTH <##F59E0B>&lCRATE"
+            if {nodecrate::textphase} is 2:
+                set name of {_k} to colored "<##F97316>&lKOTH <##FACC15>&lCRATE"
+            if {nodecrate::textphase} is 3:
+                set name of {_k} to colored "<##DC2626>&lKOTH <##FB923C>&lCRATE"
+            if {nodecrate::textphase} is 4:
+                set name of {_k} to colored "<##F43F5E>&lKOTH <##FBBF24>&lCRATE"
+
+# ============================================================
+# MAIN /CRATES GUI
+# ============================================================
+
+function nodeCrateOpenMain(p: player):
+    set {_gui} to chest inventory with 6 rows named "{@crates-menu-title}"
+
+    loop 54 times:
+        set slot (loop-number - 1) of {_gui} to black stained glass pane named " "
+
+    set slot 0 of {_gui} to purple stained glass pane named " "
+    set slot 1 of {_gui} to magenta stained glass pane named " "
+    set slot 7 of {_gui} to magenta stained glass pane named " "
+    set slot 8 of {_gui} to purple stained glass pane named " "
+    set slot 45 of {_gui} to purple stained glass pane named " "
+    set slot 46 of {_gui} to magenta stained glass pane named " "
+    set slot 52 of {_gui} to magenta stained glass pane named " "
+    set slot 53 of {_gui} to purple stained glass pane named " "
+
+    set {_info} to nether star named "&d&lNODE CRATES"
+    set lore of {_info} to "&8Physical BoxPvP Crates", "", "&7Every crate has its own:", "&f• Physical location", "&f• Animated particles", "&f• Hologram", "&f• Preview percentages", "&f• Reward pool", "&f• Jackpot rewards", "", "&7Click a crate below to preview it."
+    set slot 4 of {_gui} to {_info}
+
+    set {_crateGuiItem1} to ender chest named "&5&lRIFT CRATE"
+    set lore of {_crateGuiItem1} to "&8Entry Crate", "", "&7Money, Box XP and smaller", "&7temporary boosters.", "", "&eClick to preview."
+    set slot 19 of {_gui} to {_crateGuiItem1}
+    set {_crateGuiItem2} to ender chest named "&3&lVORTEX CRATE"
+    set lore of {_crateGuiItem2} to "&8Advanced Crate", "", "&7Better Money, XP and", "&7stronger booster chances.", "", "&eClick to preview."
+    set slot 21 of {_gui} to {_crateGuiItem2}
+    set {_crateGuiItem3} to ender chest named "&b&lASCENDANT CRATE"
+    set lore of {_crateGuiItem3} to "&8High-Tier Crate", "", "&7Large rewards and strong", "&7temporary multipliers.", "", "&eClick to preview."
+    set slot 23 of {_gui} to {_crateGuiItem3}
+    set {_crateGuiItem4} to ender chest named "&6&lSOVEREIGN CRATE"
+    set lore of {_crateGuiItem4} to "&8Elite Crate", "", "&7The strongest regular crate.", "&7Contains a &dvery rare Mining Minion&7.", "", "&eClick to preview."
+    set slot 25 of {_gui} to {_crateGuiItem4}
+
+    set {_crateGuiItem5} to amethyst block named "&d&lMULTIPLIER CRATE"
+    set lore of {_crateGuiItem5} to "&8Booster-Only Crate", "", "&7Every reward is a temporary", "&7Money, XP or Skills multiplier.", "", "&eClick to preview."
+    set slot 30 of {_gui} to {_crateGuiItem5}
+    set {_crateGuiItem6} to redstone block named "&c&lKOTH CRATE"
+    set lore of {_crateGuiItem6} to "&8Competitive Event Crate", "", "&7Exclusive high-value rewards", "&7for KOTH competition.", "&7Contains a &drare Mining Minion&7.", "", "&eClick to preview."
+    set slot 32 of {_gui} to {_crateGuiItem6}
+
+    set {_tp} to compass named "&a&lTELEPORT TO CRATES"
+    set lore of {_tp} to "&7Teleport to the physical", "&7crate section.", "", "&eClick to teleport."
+    set slot 40 of {_gui} to {_tp}
+
+    set slot 49 of {_gui} to barrier named "&c&lCLOSE"
+
+    open {_gui} to {_p}
+
+command /crates:
+    trigger:
+        # Hard combat lock: /crates can NEVER be used while combat-tagged.
+        if {box::%player's uuid%::combat} is set:
+            if {box::%player's uuid%::combat} > 0:
+                send "{@crates-prefix} &cYou cannot use /crates while in combat." to player
+                play sound "entity.villager.no" with volume 1 and pitch 1 to player
+                stop
+
+        if {nodecrate::warp} is not set:
+            send "{@crates-prefix} &cThe crate area has not been set yet." to player
+            stop
+
+        teleport player to {nodecrate::warp}
+        play sound "entity.enderman.teleport" with volume 1 and pitch 1.2 to player
+        send action bar "&dCRATES &8• &fTeleported to the crate area" to player
+
+command /cratemenu:
+    trigger:
+        nodeCrateOpenMain(player)
+
+command /cratepreview <text>:
+    trigger:
+        set {_crate} to nodeCrateType(arg-1)
+        if {_crate} is "invalid":
+            send "{@crates-prefix} &cUnknown crate. Use Rift, Vortex, Ascendant, Sovereign, Multiplier or KOTH." to player
+            stop
+        nodeCratePreview(player, {_crate})
+
+# ============================================================
+# PREVIEW GUI
+# ============================================================
+
+function nodeCratePreview(p: player, crate: text):
+    set {_display} to nodeCrateDisplay({_crate})
+    set {_gui} to chest inventory with 5 rows named "&8Preview • %{_display}%"
+
+    loop 45 times:
+        set slot (loop-number - 1) of {_gui} to black stained glass pane named " "
+
+    set slot 0 of {_gui} to purple stained glass pane named " "
+    set slot 1 of {_gui} to magenta stained glass pane named " "
+    set slot 7 of {_gui} to magenta stained glass pane named " "
+    set slot 8 of {_gui} to purple stained glass pane named " "
+    set slot 36 of {_gui} to purple stained glass pane named " "
+    set slot 37 of {_gui} to magenta stained glass pane named " "
+    set slot 43 of {_gui} to magenta stained glass pane named " "
+    set slot 44 of {_gui} to purple stained glass pane named " "
+
+    set {_header} to beacon named "%{_display}%"
+    set lore of {_header} to "&8Reward Preview", "", "&7Every reward below shows its", "&7exact selection chance.", "", "&fPreviewing never requires a key."
+    set slot 4 of {_gui} to {_header}
+
+    # ========================================================
+    # RIFT - 13 rewards / 100%
+    # ========================================================
+    if {_crate} is "rift":
+        set {_i} to gold nugget named "&a&l$20,000"
+        set lore of {_i} to "&7Chance: &e18%%"
+        set slot 10 of {_gui} to {_i}
+
+        set {_i} to gold ingot named "&a&l$35,000"
+        set lore of {_i} to "&7Chance: &e17%%"
+        set slot 11 of {_gui} to {_i}
+
+        set {_i} to gold ingot named "&a&l$60,000"
+        set lore of {_i} to "&7Chance: &e12%%"
+        set slot 12 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l400 BOX XP"
+        set lore of {_i} to "&7Chance: &e16%%"
+        set slot 13 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l800 BOX XP"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 14 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l1,500 BOX XP"
+        set lore of {_i} to "&7Chance: &e8%%"
+        set slot 15 of {_gui} to {_i}
+
+        set {_i} to emerald named "&a&l1.25x MONEY"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f15 minutes"
+        set slot 16 of {_gui} to {_i}
+
+        set {_i} to lapis lazuli named "&b&l1.25x XP"
+        set lore of {_i} to "&7Chance: &e4%%", "&7Duration: &f15 minutes"
+        set slot 19 of {_gui} to {_i}
+
+        set {_i} to amethyst shard named "&d&l1.25x SKILLS"
+        set lore of {_i} to "&7Chance: &e3%%", "&7Duration: &f15 minutes"
+        set slot 20 of {_gui} to {_i}
+
+        set {_i} to firework rocket named "&c&l32 FLIGHT ROCKETS"
+        set lore of {_i} to "&7Chance: &e1%%"
+        set slot 21 of {_gui} to {_i}
+
+        set {_i} to name tag named "&8[<##581C87>&l✦ <##6D28D9>&lR<##7C3AED>&lI<##9333EA>&lF<##A855F7>&lT <##C084FC>&l✦&8]"
+        set lore of {_i} to "&7Chance: &d2%%", "", "&7Tag Preview:", "&8[<##581C87>&l✦ <##6D28D9>&lR<##7C3AED>&lI<##9333EA>&lF<##A855F7>&lT <##C084FC>&l✦&8]", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Rift chat tag.", "&7Duplicate: &a$100,000"
+        set slot 22 of {_gui} to {_i}
+
+        set {_i} to tripwire hook named "&3&lVORTEX KEY"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lTOP REWARD"
+        set slot 23 of {_gui} to {_i}
+
+        set {_i} to gold block named "&6&l$250,000 JACKPOT"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    # ========================================================
+    # VORTEX - 14 rewards / 100%
+    # ========================================================
+    if {_crate} is "vortex":
+        set {_i} to gold ingot named "&a&l$60,000"
+        set lore of {_i} to "&7Chance: &e15%%"
+        set slot 10 of {_gui} to {_i}
+
+        set {_i} to gold block named "&a&l$100,000"
+        set lore of {_i} to "&7Chance: &e16%%"
+        set slot 11 of {_gui} to {_i}
+
+        set {_i} to gold block named "&a&l$175,000"
+        set lore of {_i} to "&7Chance: &e12%%"
+        set slot 12 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l2,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e16%%"
+        set slot 13 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l4,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 14 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&b&l7,500 BOX XP"
+        set lore of {_i} to "&7Chance: &e8%%"
+        set slot 15 of {_gui} to {_i}
+
+        set {_i} to emerald named "&a&l1.5x MONEY"
+        set lore of {_i} to "&7Chance: &e6%%", "&7Duration: &f20 minutes"
+        set slot 16 of {_gui} to {_i}
+
+        set {_i} to lapis lazuli named "&b&l1.5x XP"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f20 minutes"
+        set slot 19 of {_gui} to {_i}
+
+        set {_i} to amethyst shard named "&d&l1.5x SKILLS"
+        set lore of {_i} to "&7Chance: &e4%%", "&7Duration: &f20 minutes"
+        set slot 20 of {_gui} to {_i}
+
+        set {_i} to firework rocket named "&c&l64 FLIGHT ROCKETS"
+        set lore of {_i} to "&7Chance: &e1%%"
+        set slot 21 of {_gui} to {_i}
+
+        set {_i} to name tag named "&8[<##0891B2>&l◈ <##06B6D4>&lV<##0EA5E9>&lO<##3B82F6>&lR<##6366F1>&lT<##8B5CF6>&lE<##A855F7>&lX <##D946EF>&l◈&8]"
+        set lore of {_i} to "&7Chance: &d1.5%%", "", "&7Tag Preview:", "&8[<##0891B2>&l◈ <##06B6D4>&lV<##0EA5E9>&lO<##3B82F6>&lR<##6366F1>&lT<##8B5CF6>&lE<##A855F7>&lX <##D946EF>&l◈&8]", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Vortex chat tag.", "&7Duplicate: &a$200,000"
+        set slot 22 of {_gui} to {_i}
+
+        set {_i} to cyan dye named "&b&lAQUA CHAT COLOUR"
+        set lore of {_i} to "&7Chance: &d1.5%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks Aqua chat messages.", "&7Duplicate: &a$200,000"
+        set slot 28 of {_gui} to {_i}
+
+        set {_i} to tripwire hook named "&b&lASCENDANT KEY"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lTOP REWARD"
+        set slot 23 of {_gui} to {_i}
+
+        set {_i} to gold block named "&6&l$500,000 JACKPOT"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    # ========================================================
+    # ASCENDANT - 16 rewards / 100%
+    # ========================================================
+    if {_crate} is "ascendant":
+        set {_i} to gold block named "&a&l$125,000"
+        set lore of {_i} to "&7Chance: &e12.4%%"
+        set slot 10 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$200,000"
+        set lore of {_i} to "&7Chance: &e14%%"
+        set slot 11 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$350,000"
+        set lore of {_i} to "&7Chance: &e10%%"
+        set slot 12 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l6,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e15%%"
+        set slot 13 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l10,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 14 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l17,500 BOX XP"
+        set lore of {_i} to "&7Chance: &e9%%"
+        set slot 15 of {_gui} to {_i}
+        set {_i} to emerald block named "&a&l1.75x MONEY"
+        set lore of {_i} to "&7Chance: &e7%%", "&7Duration: &f30 minutes"
+        set slot 16 of {_gui} to {_i}
+        set {_i} to lapis block named "&b&l1.75x XP"
+        set lore of {_i} to "&7Chance: &e6%%", "&7Duration: &f30 minutes"
+        set slot 19 of {_gui} to {_i}
+        set {_i} to amethyst block named "&d&l1.75x SKILLS"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f30 minutes"
+        set slot 20 of {_gui} to {_i}
+        set {_i} to firework rocket named "&c&l96 FLIGHT ROCKETS"
+        set lore of {_i} to "&7Chance: &e2.5%%"
+        set slot 21 of {_gui} to {_i}
+        set {_i} to bow named "&c&lNODE WAR BOW"
+        set lore of {_i} to "&7Chance: &e1.5%%", "&7Power V • Punch II • Flame I"
+        set slot 22 of {_gui} to {_i}
+
+        set {_i} to name tag named "&8[<##F0ABFC>&l✧ <##E879F9>&lA<##D946EF>&lS<##C026D3>&lC<##A855F7>&lE<##8B5CF6>&lN<##6366F1>&lD<##3B82F6>&lA<##0EA5E9>&lN<##06B6D4>&lT <##67E8F9>&l✧&8]"
+        set lore of {_i} to "&7Chance: &d1.2%%", "", "&7Tag Preview:", "&8[<##F0ABFC>&l✧ <##E879F9>&lA<##D946EF>&lS<##C026D3>&lC<##A855F7>&lE<##8B5CF6>&lN<##6366F1>&lD<##3B82F6>&lA<##0EA5E9>&lN<##06B6D4>&lT <##67E8F9>&l✧&8]", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Ascendant chat tag.", "&7Duplicate: &a$400,000"
+        set slot 23 of {_gui} to {_i}
+
+        set {_i} to pink dye named "&d&lROSE PINK CHAT COLOUR"
+        set lore of {_i} to "&7Chance: &d1.2%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks Rose Pink chat messages.", "&7Duplicate: &a$400,000"
+        set slot 28 of {_gui} to {_i}
+
+        set {_i} to enchanting table named "&5&lARCANE RING"
+        set lore of {_i} to "&7Chance: &d1.2%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Arcane foot effect.", "&7Duplicate: &a$400,000"
+        set slot 29 of {_gui} to {_i}
+
+        set {_i} to tripwire hook named "&6&lSOVEREIGN KEY"
+        set lore of {_i} to "&7Chance: &e0.7%%", "", "&6&lTOP REWARD"
+        set slot 24 of {_gui} to {_i}
+        set {_i} to gold block named "&6&l$1,000,000 JACKPOT"
+        set lore of {_i} to "&7Chance: &e0.3%%", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    # ========================================================
+    # SOVEREIGN - 17 rewards / 100%
+    # Mining Minion = 0.4%
+    # ========================================================
+    if {_crate} is "sovereign":
+        set {_i} to gold block named "&a&l$250,000"
+        set lore of {_i} to "&7Chance: &e12.3%%"
+        set slot 10 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$400,000"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 11 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$650,000"
+        set lore of {_i} to "&7Chance: &e10%%"
+        set slot 12 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l12,500 BOX XP"
+        set lore of {_i} to "&7Chance: &e15%%"
+        set slot 13 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l20,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 14 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l35,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e9%%"
+        set slot 15 of {_gui} to {_i}
+        set {_i} to emerald block named "&a&l2.0x MONEY"
+        set lore of {_i} to "&7Chance: &e7%%", "&7Duration: &f30 minutes"
+        set slot 16 of {_gui} to {_i}
+        set {_i} to lapis block named "&b&l2.0x XP"
+        set lore of {_i} to "&7Chance: &e6%%", "&7Duration: &f30 minutes"
+        set slot 19 of {_gui} to {_i}
+        set {_i} to amethyst block named "&d&l2.0x SKILLS"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f30 minutes"
+        set slot 20 of {_gui} to {_i}
+        set {_i} to totem of undying named "&e&lTOTEM OF UNDYING"
+        set lore of {_i} to "&7Chance: &e3%%"
+        set slot 21 of {_gui} to {_i}
+        set {_i} to elytra named "&b&lELYTRA"
+        set lore of {_i} to "&7Chance: &e2%%"
+        set slot 22 of {_gui} to {_i}
+
+        set {_i} to name tag named "&8[<##FFF7AE>&l♛ <##FDE047>&lS<##FACC15>&lO<##FBBF24>&lV<##F59E0B>&lE<##F97316>&lR<##F59E0B>&lE<##FBBF24>&lI<##FACC15>&lG<##FDE047>&lN <##FFF7AE>&l♛&8]"
+        set lore of {_i} to "&7Chance: &d1%%", "", "&7Tag Preview:", "&8[<##FFF7AE>&l♛ <##FDE047>&lS<##FACC15>&lO<##FBBF24>&lV<##F59E0B>&lE<##F97316>&lR<##F59E0B>&lE<##FBBF24>&lI<##FACC15>&lG<##FDE047>&lN <##FFF7AE>&l♛&8]", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Sovereign chat tag.", "&7Duplicate: &a$750,000"
+        set slot 28 of {_gui} to {_i}
+
+        set {_i} to red dye named "&c&lCRIMSON RED CHAT COLOUR"
+        set lore of {_i} to "&7Chance: &d0.9%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks Crimson Red chat messages.", "&7Duplicate: &a$750,000"
+        set slot 29 of {_gui} to {_i}
+
+        set {_i} to experience bottle named "&5&lARCANE SPIRAL"
+        set lore of {_i} to "&7Chance: &d0.8%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Arcane body effect.", "&7Duplicate: &a$750,000"
+        set slot 30 of {_gui} to {_i}
+
+        set {_i} to player head named "&d&l✦ MINING MINION ✦"
+        set lore of {_i} to "&7Chance: &d0.4%%", "", "&d&lULTRA RARE REWARD", "&7Soulbound • One per player", "&7Works only while the owner is online.", "", "&7If already owned, the reward", "&7becomes the crate jackpot instead."
+        set slot 23 of {_gui} to {_i}
+        set {_i} to tripwire hook named "&d&lMULTIPLIER KEY"
+        set lore of {_i} to "&7Chance: &e1.1%%", "", "&6&lTOP REWARD"
+        set slot 24 of {_gui} to {_i}
+        set {_i} to gold block named "&6&l$2,000,000 JACKPOT"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    # ========================================================
+    # MULTIPLIER - 12 rewards / 100%
+    # ========================================================
+    if {_crate} is "multiplier":
+        set {_i} to emerald named "&a&l1.25x MONEY"
+        set lore of {_i} to "&7Chance: &e15%%", "&7Duration: &f20 minutes"
+        set slot 10 of {_gui} to {_i}
+        set {_i} to lapis lazuli named "&b&l1.25x XP"
+        set lore of {_i} to "&7Chance: &e15%%", "&7Duration: &f20 minutes"
+        set slot 11 of {_gui} to {_i}
+        set {_i} to amethyst shard named "&d&l1.25x SKILLS"
+        set lore of {_i} to "&7Chance: &e15%%", "&7Duration: &f20 minutes"
+        set slot 12 of {_gui} to {_i}
+        set {_i} to emerald named "&a&l1.5x MONEY"
+        set lore of {_i} to "&7Chance: &e12%%", "&7Duration: &f30 minutes"
+        set slot 13 of {_gui} to {_i}
+        set {_i} to lapis lazuli named "&b&l1.5x XP"
+        set lore of {_i} to "&7Chance: &e12%%", "&7Duration: &f30 minutes"
+        set slot 14 of {_gui} to {_i}
+        set {_i} to amethyst shard named "&d&l1.5x SKILLS"
+        set lore of {_i} to "&7Chance: &e12%%", "&7Duration: &f30 minutes"
+        set slot 15 of {_gui} to {_i}
+        set {_i} to emerald block named "&a&l2.0x MONEY"
+        set lore of {_i} to "&7Chance: &e6%%", "&7Duration: &f30 minutes"
+        set slot 19 of {_gui} to {_i}
+        set {_i} to lapis block named "&b&l2.0x XP"
+        set lore of {_i} to "&7Chance: &e6%%", "&7Duration: &f30 minutes"
+        set slot 20 of {_gui} to {_i}
+        set {_i} to amethyst block named "&d&l2.0x SKILLS"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f30 minutes"
+        set slot 21 of {_gui} to {_i}
+        set {_i} to beacon named "&6&lALL BOOSTERS • 1.75x"
+        set lore of {_i} to "&7Chance: &e1.5%%", "&7Duration: &f30 minutes", "", "&6&lTOP REWARD"
+        set slot 23 of {_gui} to {_i}
+        set {_i} to beacon named "&6&lALL BOOSTERS • 2.0x"
+        set lore of {_i} to "&7Chance: &e0.4%%", "&7Duration: &f45 minutes", "", "&6&lTOP REWARD"
+        set slot 24 of {_gui} to {_i}
+        set {_i} to nether star named "&6&lALL BOOSTERS • 2.5x"
+        set lore of {_i} to "&7Chance: &e0.1%%", "&7Duration: &f30 minutes", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    # ========================================================
+    # KOTH - 16 rewards / 100%
+    # Mining Minion = 0.7%
+    # ========================================================
+    if {_crate} is "koth":
+        set {_i} to gold block named "&a&l$400,000"
+        set lore of {_i} to "&7Chance: &e12.2%%"
+        set slot 10 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$650,000"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 11 of {_gui} to {_i}
+        set {_i} to gold block named "&a&l$1,000,000"
+        set lore of {_i} to "&7Chance: &e10%%"
+        set slot 12 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l20,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e14%%"
+        set slot 13 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l35,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e13%%"
+        set slot 14 of {_gui} to {_i}
+        set {_i} to experience bottle named "&b&l50,000 BOX XP"
+        set lore of {_i} to "&7Chance: &e9%%"
+        set slot 15 of {_gui} to {_i}
+        set {_i} to emerald block named "&a&l2.0x MONEY"
+        set lore of {_i} to "&7Chance: &e8%%", "&7Duration: &f45 minutes"
+        set slot 16 of {_gui} to {_i}
+        set {_i} to lapis block named "&b&l2.0x XP"
+        set lore of {_i} to "&7Chance: &e7%%", "&7Duration: &f45 minutes"
+        set slot 19 of {_gui} to {_i}
+        set {_i} to amethyst block named "&d&l2.0x SKILLS"
+        set lore of {_i} to "&7Chance: &e5%%", "&7Duration: &f45 minutes"
+        set slot 20 of {_gui} to {_i}
+        set {_i} to totem of undying named "&e&lTOTEM OF UNDYING"
+        set lore of {_i} to "&7Chance: &e3%%"
+        set slot 21 of {_gui} to {_i}
+
+        set {_i} to name tag named "&8[<##FDE047>&l♛ <##FACC15>&lV<##F59E0B>&lI<##F97316>&lC<##EF4444>&lT<##EC4899>&lO<##A855F7>&lR <##FDE047>&l♛&8]"
+        set lore of {_i} to "&7Chance: &d1%%", "", "&7Tag Preview:", "&8[<##FDE047>&l♛ <##FACC15>&lV<##F59E0B>&lI<##F97316>&lC<##EF4444>&lT<##EC4899>&lO<##A855F7>&lR <##FDE047>&l♛&8]", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Victor chat tag.", "&7Duplicate: &a$1,000,000"
+        set slot 28 of {_gui} to {_i}
+
+        set {_i} to amethyst shard named "&b&lELECTRIC SPIRAL"
+        set lore of {_i} to "&7Chance: &d0.8%%", "", "&d&lPERMANENT COSMETIC", "&7Unlocks the Electric body effect.", "&7Duplicate: &a$1,000,000"
+        set slot 29 of {_gui} to {_i}
+
+        set {_i} to player head named "&d&l✦ MINING MINION ✦"
+        set lore of {_i} to "&7Chance: &d0.7%%", "", "&d&lULTRA RARE REWARD", "&7Soulbound • One per player", "&7Works only while the owner is online.", "", "&7If already owned, the reward", "&7becomes the KOTH jackpot instead."
+        set slot 22 of {_gui} to {_i}
+        set {_i} to tripwire hook named "&6&lSOVEREIGN KEY"
+        set lore of {_i} to "&7Chance: &e1.3%%", "", "&6&lTOP REWARD"
+        set slot 23 of {_gui} to {_i}
+        set {_i} to beacon named "&6&lALL BOOSTERS • 2.0x"
+        set lore of {_i} to "&7Chance: &e1.5%%", "&7Duration: &f45 minutes", "", "&6&lTOP REWARD"
+        set slot 24 of {_gui} to {_i}
+        set {_i} to nether star named "&6&l$3,000,000 KOTH JACKPOT"
+        set lore of {_i} to "&7Chance: &e0.5%%", "", "&6&lJACKPOT • BROADCAST"
+        set slot 25 of {_gui} to {_i}
+
+    set {_back} to arrow named "&e&lBACK"
+    set lore of {_back} to "&7Return to the crate browser."
+    set slot 39 of {_gui} to {_back}
+
+    set {_info} to tripwire hook named "&a&lHOW TO OPEN"
+    set lore of {_info} to "&7Get the matching physical key,", "&7then right-click the Beacon.", "", "&fPreviewing never requires a key."
+    set slot 40 of {_gui} to {_info}
+
+    set slot 41 of {_gui} to barrier named "&c&lCLOSE"
+
+    open {_gui} to {_p}
+
+# ============================================================
+# OPENING ANIMATION
+# ============================================================
+
+function nodeCrateAnimationItem(crate: text, step: number) :: item:
+    if {_step} is 1:
+        return gold ingot named "&6&lROLLING..."
+    if {_step} is 2:
+        return experience bottle named "&b&lROLLING..."
+    if {_step} is 3:
+        return emerald named "&a&lROLLING..."
+    if {_step} is 4:
+        return tripwire hook named "&e&lROLLING..."
+    if {_step} is 5:
+        return amethyst shard named "&d&lROLLING..."
+    if {_step} is 6:
+        return gold block named "&6&lROLLING..."
+    return nether star named "&f&lSELECTING REWARD..."
+
+function nodeCrateStartOpening(p: player, crate: text):
+    set {_u} to uuid of {_p}
+
+    if {nodecrate::opening::%{_u}%} is true:
+        send "{@crates-prefix} &cYou are already opening a crate." to {_p}
+        stop
+
+    if nodeCrateHasKey({_p}, {_crate}) is false:
+        set {_neededDisplay} to nodeCrateDisplay({_crate})
+        send "{@crates-prefix} &cYou need a %{_neededDisplay}% &cKey to open this crate." to {_p}
+        play sound "entity.villager.no" with volume 1 and pitch 1 to {_p}
+        stop
+
+    set {nodecrate::opening::%{_u}%} to true
+    nodeCrateTakeKey({_p}, {_crate})
+
+    set {_title} to nodeCrateDisplay({_crate})
+    set {_gui} to chest inventory with 3 rows named "&8Opening • %{_title}%"
+
+    loop 27 times:
+        set slot (loop-number - 1) of {_gui} to black stained glass pane named " "
+
+    set {_header} to beacon named "%{_title}%"
+    set lore of {_header} to "&7Rewards are rolling across the lane...", "", "&eThe winning reward lands in the middle."
+    set slot 4 of {_gui} to {_header}
+
+    # 9-slot reward reel across the full middle row.
+    loop 9 times:
+        set {_slot} to loop-number + 8
+        set slot {_slot} of {_gui} to nodeCrateAnimationItem({_crate}, random integer between 1 and 6)
+
+    set slot 13 of {_gui} to nether star named "&e&l▼ WINNER ▼" with lore "&7The final reward stops here."
+    open {_gui} to {_p}
+
+    play sound "block.note_block.pling" with volume 1 and pitch 0.8 to {_p}
+
+    set {_spin} to 0
+    while {_spin} < 34:
+        wait 2 ticks
+
+        if {_p} is not online:
+            delete {nodecrate::opening::%{_u}%}
+            stop
+
+        if name of {_p}'s current inventory does not contain "Opening":
+            delete {nodecrate::opening::%{_u}%}
+            stop
+
+        # Shift every visible reward one slot left.
+        set {_i10} to slot 10 of {_p}'s current inventory
+        set {_i11} to slot 11 of {_p}'s current inventory
+        set {_i12} to slot 12 of {_p}'s current inventory
+        set {_i13} to slot 13 of {_p}'s current inventory
+        set {_i14} to slot 14 of {_p}'s current inventory
+        set {_i15} to slot 15 of {_p}'s current inventory
+        set {_i16} to slot 16 of {_p}'s current inventory
+        set {_i17} to slot 17 of {_p}'s current inventory
+
+        set slot 9 of {_p}'s current inventory to {_i10}
+        set slot 10 of {_p}'s current inventory to {_i11}
+        set slot 11 of {_p}'s current inventory to {_i12}
+        set slot 12 of {_p}'s current inventory to {_i13}
+        set slot 13 of {_p}'s current inventory to {_i14}
+        set slot 14 of {_p}'s current inventory to {_i15}
+        set slot 15 of {_p}'s current inventory to {_i16}
+        set slot 16 of {_p}'s current inventory to {_i17}
+
+        set {_step} to random integer between 1 and 6
+        set slot 17 of {_p}'s current inventory to nodeCrateAnimationItem({_crate}, {_step})
+
+        add 1 to {_spin}
+
+        if {_spin} <= 14:
+            play sound "block.note_block.hat" with volume 0.65 and pitch 1.6 to {_p}
+            wait 1 tick
+        else if {_spin} <= 24:
+            play sound "block.note_block.hat" with volume 0.7 and pitch 1.4 to {_p}
+            wait 2 ticks
+        else if {_spin} <= 30:
+            play sound "block.note_block.hat" with volume 0.8 and pitch 1.2 to {_p}
+            wait 4 ticks
+        else:
+            play sound "block.note_block.hat" with volume 0.9 and pitch 1.0 to {_p}
+            wait 6 ticks
+
+    if {_p} is not online:
+        delete {nodecrate::opening::%{_u}%}
+        stop
+
+    if name of {_p}'s current inventory does not contain "Opening":
+        delete {nodecrate::opening::%{_u}%}
+        stop
+
+    # Clear surrounding reel slots before revealing the real reward.
+    set slot 9 of {_p}'s current inventory to black stained glass pane named " "
+    set slot 10 of {_p}'s current inventory to black stained glass pane named " "
+    set slot 11 of {_p}'s current inventory to black stained glass pane named " "
+    set slot 12 of {_p}'s current inventory to yellow stained glass pane named "&e&l▶"
+    set slot 14 of {_p}'s current inventory to yellow stained glass pane named "&e&l◀"
+    set slot 15 of {_p}'s current inventory to black stained glass pane named " "
+    set slot 16 of {_p}'s current inventory to black stained glass pane named " "
+    set slot 17 of {_p}'s current inventory to black stained glass pane named " "
+
+    nodeCrateRoll({_p}, {_crate})
+    delete {nodecrate::opening::%{_u}%}
+
+# ============================================================
+# MINING MINION ULTRA-RARE CELEBRATION
+# Used only when the player ACTUALLY wins their first Mining Minion.
+# ============================================================
+
+function nodeCrateMinionCelebration(p: player, crate: text):
+    set {_display} to nodeCrateDisplay({_crate})
+
+    broadcast ""
+    broadcast "&d&l✦✦✦ &6&lULTRA RARE CRATE WIN &d&l✦✦✦"
+    broadcast "&f%{_p}% &7has won the &d&l✦ MINING MINION ✦ &7from %{_display}%&7!"
+    broadcast "&eA one-per-player, Soulbound automated miner has been unlocked!"
+    broadcast "&d&l✦✦✦ &6&lULTRA RARE CRATE WIN &d&l✦✦✦"
+    broadcast ""
+
+    loop all players:
+        send action bar "&d&l✦ MINING MINION WON ✦ &8• &f%{_p}% &7from %{_display}%" to loop-player
+        play sound "ui.toast.challenge_complete" with volume 1 and pitch 1.15 to loop-player
+
+    # Large staged firework celebration around the winner.
+    launch flickering trailing star firework colored purple and white at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing burst firework colored yellow and white at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing ball firework colored aqua and purple at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing star firework colored red and yellow at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing burst firework colored purple and pink at {_p}'s location with duration 1
+    wait 4 ticks
+    launch trailing star firework colored yellow and aqua at {_p}'s location with duration 1
+
+    send "" to {_p}
+    send "&d&l✦ MINING MINION UNLOCKED ✦" to {_p}
+    send "&fThis is an &dULTRA RARE &fcrate reward." to {_p}
+    send "&7Your Minion is Soulbound, one-per-player and permanently yours." to {_p}
+    send "&7Use &f/minion &7to view your Minion information." to {_p}
+    send "" to {_p}
+
+
+# ============================================================
+# CRATE GG CELEBRATION
+# High-tier crate wins can start a short server-wide GG event.
+# Each player can claim 1 Essence once by typing exactly "gg".
+# ============================================================
+
+function nodeCrateStartGG(p: player, crate: text, reward: text):
+    set {_display} to nodeCrateDisplay({_crate})
+
+    # Replace any older celebration cleanly.
+    add 1 to {nodecrate::gg::id}
+    set {_id} to {nodecrate::gg::id}
+
+    set {nodecrate::gg::active} to true
+    delete {nodecrate::gg::claimed::*}
+
+    broadcast ""
+    broadcast "&d&l✦ &b&lCRATE WIN &d&l✦ &8» &f%{_p}% &7won %{_reward}% &7from %{_display}%&7!"
+    broadcast "&cG&6G&e! &aType &f&lGG &ain chat within &f10 seconds &ato receive &d+1 Essence&a!"
+    broadcast ""
+
+    # Bigger celebration on the winning player.
+    launch flickering trailing burst firework colored purple and white at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing star firework colored yellow and white at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing ball firework colored aqua and purple at {_p}'s location with duration 1
+    wait 4 ticks
+    launch flickering trailing burst firework colored red and yellow at {_p}'s location with duration 1
+
+    wait 188 ticks
+
+    if {nodecrate::gg::active} is true:
+        if {nodecrate::gg::id} is {_id}:
+            set {nodecrate::gg::active} to false
+            broadcast "&8[&dCrates&8] &7The &cG&6G&e! &7reward window has ended."
+            delete {nodecrate::gg::claimed::*}
+
+# ============================================================
+# REWARD ROLLS
+# Integer roll 1-100 = exact whole percent chances.
+# ============================================================
+
+function nodeCrateRoll(p: player, crate: text):
+    set {_roll} to random integer between 1 and 10000
+    set {_reward} to "&fUnknown Reward"
+    set {_jackpot} to false
+    set {_minionWin} to false
+
+    # ---------------- RIFT ----------------
+    if {_crate} is "rift":
+        if {_roll} <= 1800:
+            nodeCrateGiveMoney({_p}, 20000)
+            set {_reward} to "&a$20,000"
+        else if {_roll} <= 3500:
+            nodeCrateGiveMoney({_p}, 35000)
+            set {_reward} to "&a$35,000"
+        else if {_roll} <= 4700:
+            nodeCrateGiveMoney({_p}, 60000)
+            set {_reward} to "&a$60,000"
+        else if {_roll} <= 6300:
+            nodeCrateGiveBoxXp({_p}, 400)
+            set {_reward} to "&b400 Box XP"
+        else if {_roll} <= 7600:
+            nodeCrateGiveBoxXp({_p}, 800)
+            set {_reward} to "&b800 Box XP"
+        else if {_roll} <= 8400:
+            nodeCrateGiveBoxXp({_p}, 1500)
+            set {_reward} to "&b1,500 Box XP"
+        else if {_roll} <= 8900:
+            boxGiveMoneyMultiplier({_p}, 1.25, 900)
+            set {_reward} to "&a1.25x Money &7for &f15m"
+        else if {_roll} <= 9300:
+            boxGiveXpMultiplier({_p}, 1.25, 900)
+            set {_reward} to "&b1.25x XP &7for &f15m"
+        else if {_roll} <= 9600:
+            boxGiveSkillMultiplier({_p}, 1.25, 900)
+            set {_reward} to "&d1.25x Skills &7for &f15m"
+        else if {_roll} <= 9700:
+            give 32 of firework rocket to {_p}
+            set {_reward} to "&c32 Flight Rockets"
+        else if {_roll} <= 9900:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.tag.rift", "&5&l✦ RIFT TAG", 100000)
+        else if {_roll} <= 9950:
+            nodeCrateGiveKey({_p}, "vortex", 1)
+            set {_reward} to "&3&l1x Vortex Key"
+            set {_jackpot} to true
+        else:
+            nodeCrateGiveMoney({_p}, 250000)
+            set {_reward} to "&6&l$250,000 JACKPOT"
+            set {_jackpot} to true
+
+    # ---------------- VORTEX ----------------
+    if {_crate} is "vortex":
+        if {_roll} <= 1500:
+            nodeCrateGiveMoney({_p}, 60000)
+            set {_reward} to "&a$60,000"
+        else if {_roll} <= 3100:
+            nodeCrateGiveMoney({_p}, 100000)
+            set {_reward} to "&a$100,000"
+        else if {_roll} <= 4300:
+            nodeCrateGiveMoney({_p}, 175000)
+            set {_reward} to "&a$175,000"
+        else if {_roll} <= 5900:
+            nodeCrateGiveBoxXp({_p}, 2000)
+            set {_reward} to "&b2,000 Box XP"
+        else if {_roll} <= 7200:
+            nodeCrateGiveBoxXp({_p}, 4000)
+            set {_reward} to "&b4,000 Box XP"
+        else if {_roll} <= 8000:
+            nodeCrateGiveBoxXp({_p}, 7500)
+            set {_reward} to "&b7,500 Box XP"
+        else if {_roll} <= 8600:
+            boxGiveMoneyMultiplier({_p}, 1.5, 1200)
+            set {_reward} to "&a1.5x Money &7for &f20m"
+        else if {_roll} <= 9100:
+            boxGiveXpMultiplier({_p}, 1.5, 1200)
+            set {_reward} to "&b1.5x XP &7for &f20m"
+        else if {_roll} <= 9500:
+            boxGiveSkillMultiplier({_p}, 1.5, 1200)
+            set {_reward} to "&d1.5x Skills &7for &f20m"
+        else if {_roll} <= 9600:
+            give 64 of firework rocket to {_p}
+            set {_reward} to "&c64 Flight Rockets"
+        else if {_roll} <= 9750:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.tag.vortex", "&3&l◈ VORTEX TAG", 200000)
+        else if {_roll} <= 9900:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.chat.aqua", "&b&lAQUA CHAT COLOUR", 200000)
+        else if {_roll} <= 9950:
+            nodeCrateGiveKey({_p}, "ascendant", 1)
+            set {_reward} to "&b&l1x Ascendant Key"
+            set {_jackpot} to true
+        else:
+            nodeCrateGiveMoney({_p}, 500000)
+            set {_reward} to "&6&l$500,000 JACKPOT"
+            set {_jackpot} to true
+
+    # ---------------- ASCENDANT ----------------
+    if {_crate} is "ascendant":
+        if {_roll} <= 1240:
+            nodeCrateGiveMoney({_p}, 125000)
+            set {_reward} to "&a$125,000"
+        else if {_roll} <= 2640:
+            nodeCrateGiveMoney({_p}, 200000)
+            set {_reward} to "&a$200,000"
+        else if {_roll} <= 3640:
+            nodeCrateGiveMoney({_p}, 350000)
+            set {_reward} to "&a$350,000"
+        else if {_roll} <= 5140:
+            nodeCrateGiveBoxXp({_p}, 6000)
+            set {_reward} to "&b6,000 Box XP"
+        else if {_roll} <= 6440:
+            nodeCrateGiveBoxXp({_p}, 10000)
+            set {_reward} to "&b10,000 Box XP"
+        else if {_roll} <= 7340:
+            nodeCrateGiveBoxXp({_p}, 17500)
+            set {_reward} to "&b17,500 Box XP"
+        else if {_roll} <= 8040:
+            boxGiveMoneyMultiplier({_p}, 1.75, 1800)
+            set {_reward} to "&a1.75x Money &7for &f30m"
+        else if {_roll} <= 8640:
+            boxGiveXpMultiplier({_p}, 1.75, 1800)
+            set {_reward} to "&b1.75x XP &7for &f30m"
+        else if {_roll} <= 9140:
+            boxGiveSkillMultiplier({_p}, 1.75, 1800)
+            set {_reward} to "&d1.75x Skills &7for &f30m"
+        else if {_roll} <= 9390:
+            give 96 of firework rocket to {_p}
+            set {_reward} to "&c96 Flight Rockets"
+        else if {_roll} <= 9540:
+            nodeCrateGiveWarBow({_p})
+            set {_reward} to "&c&lNode War Bow"
+        else if {_roll} <= 9660:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.tag.ascendant", "&d&l✧ ASCENDANT TAG", 400000)
+        else if {_roll} <= 9780:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.chat.pink", "&d&lROSE PINK CHAT COLOUR", 400000)
+        else if {_roll} <= 9900:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.foot.enchant", "&5&lARCANE RING", 400000)
+        else if {_roll} <= 9970:
+            nodeCrateGiveKey({_p}, "sovereign", 1)
+            set {_reward} to "&6&l1x Sovereign Key"
+            set {_jackpot} to true
+        else:
+            nodeCrateGiveMoney({_p}, 1000000)
+            set {_reward} to "&6&l$1,000,000 JACKPOT"
+            set {_jackpot} to true
+
+    # ---------------- SOVEREIGN ----------------
+    if {_crate} is "sovereign":
+        if {_roll} <= 1230:
+            nodeCrateGiveMoney({_p}, 250000)
+            set {_reward} to "&a$250,000"
+        else if {_roll} <= 2530:
+            nodeCrateGiveMoney({_p}, 400000)
+            set {_reward} to "&a$400,000"
+        else if {_roll} <= 3530:
+            nodeCrateGiveMoney({_p}, 650000)
+            set {_reward} to "&a$650,000"
+        else if {_roll} <= 5030:
+            nodeCrateGiveBoxXp({_p}, 12500)
+            set {_reward} to "&b12,500 Box XP"
+        else if {_roll} <= 6330:
+            nodeCrateGiveBoxXp({_p}, 20000)
+            set {_reward} to "&b20,000 Box XP"
+        else if {_roll} <= 7230:
+            nodeCrateGiveBoxXp({_p}, 35000)
+            set {_reward} to "&b35,000 Box XP"
+        else if {_roll} <= 7930:
+            boxGiveMoneyMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&a2.0x Money &7for &f30m"
+        else if {_roll} <= 8530:
+            boxGiveXpMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&b2.0x XP &7for &f30m"
+        else if {_roll} <= 9030:
+            boxGiveSkillMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&d2.0x Skills &7for &f30m"
+        else if {_roll} <= 9330:
+            give 1 totem of undying to {_p}
+            set {_reward} to "&e&lTotem of Undying"
+        else if {_roll} <= 9530:
+            give 1 elytra to {_p}
+            set {_reward} to "&b&lElytra"
+        else if {_roll} <= 9630:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.tag.sovereign", "&6&l♛ SOVEREIGN TAG", 750000)
+        else if {_roll} <= 9720:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.chat.red", "&c&lCRIMSON RED CHAT COLOUR", 750000)
+        else if {_roll} <= 9800:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.body.enchant", "&5&lARCANE SPIRAL", 750000)
+        else if {_roll} <= 9910:
+            nodeCrateGiveKey({_p}, "multiplier", 1)
+            set {_reward} to "&d&l1x Multiplier Key"
+            set {_jackpot} to true
+        else if {_roll} <= 9950:
+            if {minion::%uuid of {_p}%::owned} is true:
+                nodeCrateGiveMoney({_p}, 2000000)
+                set {_reward} to "&6&l$2,000,000 JACKPOT &7(&dMinion already owned&7)"
+            else:
+                execute console command "giveminingminion %{_p}%"
+                set {_reward} to "&d&l✦ MINING MINION ✦"
+                set {_minionWin} to true
+            set {_jackpot} to true
+        else:
+            nodeCrateGiveMoney({_p}, 2000000)
+            set {_reward} to "&6&l$2,000,000 JACKPOT"
+            set {_jackpot} to true
+
+    # ---------------- MULTIPLIER ----------------
+    if {_crate} is "multiplier":
+        if {_roll} <= 1500:
+            boxGiveMoneyMultiplier({_p}, 1.25, 1200)
+            set {_reward} to "&a1.25x Money &7for &f20m"
+        else if {_roll} <= 3000:
+            boxGiveXpMultiplier({_p}, 1.25, 1200)
+            set {_reward} to "&b1.25x XP &7for &f20m"
+        else if {_roll} <= 4500:
+            boxGiveSkillMultiplier({_p}, 1.25, 1200)
+            set {_reward} to "&d1.25x Skills &7for &f20m"
+        else if {_roll} <= 5700:
+            boxGiveMoneyMultiplier({_p}, 1.5, 1800)
+            set {_reward} to "&a1.5x Money &7for &f30m"
+        else if {_roll} <= 6900:
+            boxGiveXpMultiplier({_p}, 1.5, 1800)
+            set {_reward} to "&b1.5x XP &7for &f30m"
+        else if {_roll} <= 8100:
+            boxGiveSkillMultiplier({_p}, 1.5, 1800)
+            set {_reward} to "&d1.5x Skills &7for &f30m"
+        else if {_roll} <= 8700:
+            boxGiveMoneyMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&a2.0x Money &7for &f30m"
+        else if {_roll} <= 9300:
+            boxGiveXpMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&b2.0x XP &7for &f30m"
+        else if {_roll} <= 9800:
+            boxGiveSkillMultiplier({_p}, 2.0, 1800)
+            set {_reward} to "&d2.0x Skills &7for &f30m"
+        else if {_roll} <= 9950:
+            boxGiveMoneyMultiplier({_p}, 1.75, 1800)
+            boxGiveXpMultiplier({_p}, 1.75, 1800)
+            boxGiveSkillMultiplier({_p}, 1.75, 1800)
+            set {_reward} to "&6&lALL BOOSTERS &7• &f1.75x for 30m"
+            set {_jackpot} to true
+        else if {_roll} <= 9990:
+            boxGiveMoneyMultiplier({_p}, 2.0, 2700)
+            boxGiveXpMultiplier({_p}, 2.0, 2700)
+            boxGiveSkillMultiplier({_p}, 2.0, 2700)
+            set {_reward} to "&6&lALL BOOSTERS &7• &f2.0x for 45m"
+            set {_jackpot} to true
+        else:
+            boxGiveMoneyMultiplier({_p}, 2.5, 1800)
+            boxGiveXpMultiplier({_p}, 2.5, 1800)
+            boxGiveSkillMultiplier({_p}, 2.5, 1800)
+            set {_reward} to "&6&lALL BOOSTERS &7• &f2.5x for 30m"
+            set {_jackpot} to true
+
+    # ---------------- KOTH ----------------
+    if {_crate} is "koth":
+        if {_roll} <= 1220:
+            nodeCrateGiveMoney({_p}, 400000)
+            set {_reward} to "&a$400,000"
+        else if {_roll} <= 2520:
+            nodeCrateGiveMoney({_p}, 650000)
+            set {_reward} to "&a$650,000"
+        else if {_roll} <= 3520:
+            nodeCrateGiveMoney({_p}, 1000000)
+            set {_reward} to "&a$1,000,000"
+        else if {_roll} <= 4920:
+            nodeCrateGiveBoxXp({_p}, 20000)
+            set {_reward} to "&b20,000 Box XP"
+        else if {_roll} <= 6220:
+            nodeCrateGiveBoxXp({_p}, 35000)
+            set {_reward} to "&b35,000 Box XP"
+        else if {_roll} <= 7120:
+            nodeCrateGiveBoxXp({_p}, 50000)
+            set {_reward} to "&b50,000 Box XP"
+        else if {_roll} <= 7920:
+            boxGiveMoneyMultiplier({_p}, 2.0, 2700)
+            set {_reward} to "&a2.0x Money &7for &f45m"
+        else if {_roll} <= 8620:
+            boxGiveXpMultiplier({_p}, 2.0, 2700)
+            set {_reward} to "&b2.0x XP &7for &f45m"
+        else if {_roll} <= 9120:
+            boxGiveSkillMultiplier({_p}, 2.0, 2700)
+            set {_reward} to "&d2.0x Skills &7for &f45m"
+        else if {_roll} <= 9420:
+            give 1 totem of undying to {_p}
+            set {_reward} to "&e&lTotem of Undying"
+        else if {_roll} <= 9520:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.tag.victor", "&e&l★ VICTOR TAG", 1000000)
+        else if {_roll} <= 9600:
+            set {_reward} to nodeCrateGiveCosmetic({_p}, "box.cosmetic.body.spark", "&b&lELECTRIC SPIRAL", 1000000)
+        else if {_roll} <= 9730:
+            nodeCrateGiveKey({_p}, "sovereign", 1)
+            set {_reward} to "&6&l1x Sovereign Key"
+            set {_jackpot} to true
+        else if {_roll} <= 9800:
+            if {minion::%uuid of {_p}%::owned} is true:
+                nodeCrateGiveMoney({_p}, 3000000)
+                set {_reward} to "&6&l$3,000,000 KOTH JACKPOT &7(&dMinion already owned&7)"
+            else:
+                execute console command "giveminingminion %{_p}%"
+                set {_reward} to "&d&l✦ MINING MINION ✦"
+                set {_minionWin} to true
+            set {_jackpot} to true
+        else if {_roll} <= 9950:
+            boxGiveMoneyMultiplier({_p}, 2.0, 2700)
+            boxGiveXpMultiplier({_p}, 2.0, 2700)
+            boxGiveSkillMultiplier({_p}, 2.0, 2700)
+            set {_reward} to "&6&lALL BOOSTERS &7• &f2.0x for 45m"
+            set {_jackpot} to true
+        else:
+            nodeCrateGiveMoney({_p}, 3000000)
+            set {_reward} to "&6&l$3,000,000 KOTH JACKPOT"
+            set {_jackpot} to true
+
+    set {_display} to nodeCrateDisplay({_crate})
+
+    if name of {_p}'s current inventory contains "Opening":
+        set slot 13 of {_p}'s current inventory to nether star named "%{_reward}%" with lore "&7Reward selected!", "", "&7From: %{_display}%"
+
+    nodeCratePersonalReward({_p}, {_crate}, {_reward})
+    play sound "ui.toast.challenge_complete" with volume 1 and pitch 1.15 to {_p}
+    nodeCrateFirework({_p}, {_crate}, {_jackpot})
+
+    if {_minionWin} is true:
+        nodeCrateMinionCelebration({_p}, {_crate})
+    else:
+        if {_crate} is "koth":
+            nodeCrateStartGG({_p}, {_crate}, {_reward})
+        else if {_crate} is "multiplier":
+            nodeCrateStartGG({_p}, {_crate}, {_reward})
+        else if {_jackpot} is true:
+            nodeCrateStartGG({_p}, {_crate}, {_reward})
+
+# ============================================================
+# PHYSICAL CRATE INTERACTION
+# ============================================================
+
+on right click:
+    if clicked block is not set:
+        stop
+
+    set {_loc} to location of clicked block
+    set {_crate} to "invalid"
+
+    if {nodecrate::location::rift} is set:
+        if {_loc} is {nodecrate::location::rift}:
+            set {_crate} to "rift"
+
+    if {nodecrate::location::vortex} is set:
+        if {_loc} is {nodecrate::location::vortex}:
+            set {_crate} to "vortex"
+
+    if {nodecrate::location::ascendant} is set:
+        if {_loc} is {nodecrate::location::ascendant}:
+            set {_crate} to "ascendant"
+
+    if {nodecrate::location::sovereign} is set:
+        if {_loc} is {nodecrate::location::sovereign}:
+            set {_crate} to "sovereign"
+
+    if {nodecrate::location::multiplier} is set:
+        if {_loc} is {nodecrate::location::multiplier}:
+            set {_crate} to "multiplier"
+
+    if {nodecrate::location::koth} is set:
+        if {_loc} is {nodecrate::location::koth}:
+            set {_crate} to "koth"
+
+    if {_crate} is "invalid":
+        stop
+
+    cancel event
+
+    if player is sneaking:
+        nodeCratePreview(player, {_crate})
+        stop
+
+    nodeCrateStartOpening(player, {_crate})
+
+on break:
+    set {_loc} to location of event-block
+
+    if {nodecrate::location::rift} is set:
+        if {_loc} is {nodecrate::location::rift}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+    if {nodecrate::location::vortex} is set:
+        if {_loc} is {nodecrate::location::vortex}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+    if {nodecrate::location::ascendant} is set:
+        if {_loc} is {nodecrate::location::ascendant}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+    if {nodecrate::location::sovereign} is set:
+        if {_loc} is {nodecrate::location::sovereign}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+    if {nodecrate::location::multiplier} is set:
+        if {_loc} is {nodecrate::location::multiplier}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+    if {nodecrate::location::koth} is set:
+        if {_loc} is {nodecrate::location::koth}:
+            cancel event
+            send "{@crates-prefix} &cThat physical crate is protected." to player
+            stop
+
+# ============================================================
+# GUI PROTECTION / NAVIGATION
+# ============================================================
+
+on inventory click:
+    set {_title} to name of player's current inventory
+
+    if {_title} is "{@crates-menu-title}":
+        cancel event
+        if event-item is air:
+            stop
+
+        if clicked slot is 19:
+            nodeCratePreview(player, "rift")
+            stop
+        if clicked slot is 21:
+            nodeCratePreview(player, "vortex")
+            stop
+        if clicked slot is 23:
+            nodeCratePreview(player, "ascendant")
+            stop
+        if clicked slot is 25:
+            nodeCratePreview(player, "sovereign")
+            stop
+        if clicked slot is 30:
+            nodeCratePreview(player, "multiplier")
+            stop
+        if clicked slot is 32:
+            nodeCratePreview(player, "koth")
+            stop
+
+        if clicked slot is 40:
+            if {nodecrate::warp} is not set:
+                send "{@crates-prefix} &cThe crate warp has not been set yet." to player
+                stop
+            if {box::%player's uuid%::combat} is set:
+                if {box::%player's uuid%::combat} > 0:
+                    send "{@crates-prefix} &cYou cannot teleport to crates while in combat." to player
+                    stop
+            close player's inventory
+            teleport player to {nodecrate::warp}
+            play sound "entity.enderman.teleport" with volume 1 and pitch 1.2 to player
+            stop
+
+        if clicked slot is 49:
+            close player's inventory
+            stop
+
+    if {_title} contains "Preview":
+        cancel event
+        if event-item is air:
+            stop
+        if clicked slot is 39:
+            nodeCrateOpenMain(player)
+            stop
+        if clicked slot is 41:
+            close player's inventory
+            stop
+
+    if {_title} contains "Opening":
+        cancel event
+        stop
+
+on inventory drag:
+    set {_title} to name of player's current inventory
+
+    if {_title} is "{@crates-menu-title}":
+        cancel event
+
+    if {_title} contains "Preview":
+        cancel event
+
+    if {_title} contains "Opening":
+        cancel event
+
+# ============================================================
+# ADMIN COMMANDS
+# ============================================================
+
+command /cratekey <player> <text> <integer>:
+    permission: op
+    permission message: &cYou do not have permission.
+    trigger:
+        if arg-3 <= 0:
+            send "{@crates-prefix} &cAmount must be at least 1." to player
+            stop
+
+        set {_crate} to nodeCrateType(arg-2)
+        if {_crate} is "invalid":
+            send "{@crates-prefix} &cUnknown crate. Use Rift, Vortex, Ascendant, Sovereign, Multiplier or KOTH." to player
+            stop
+
+        nodeCrateGiveKey(arg-1, {_crate}, arg-3)
+        set {_display} to nodeCrateDisplay({_crate})
+
+        send "{@crates-prefix} &aGave &f%arg-3%x %{_display}% &fKey&a to &f%arg-1%&a." to player
+        send "{@crates-prefix} &7You received &f%arg-3%x %{_display}% &fKey&7." to arg-1
+        play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.25 to arg-1
+
+command /cratekeyall <text> <integer>:
+    permission: op
+    permission message: &cYou do not have permission.
+    trigger:
+        if arg-2 <= 0:
+            send "{@crates-prefix} &cAmount must be at least 1." to player
+            stop
+
+        set {_crate} to nodeCrateType(arg-1)
+        if {_crate} is "invalid":
+            send "{@crates-prefix} &cUnknown crate. Use Rift, Vortex, Ascendant, Sovereign, Multiplier or KOTH." to player
+            stop
+
+        loop all players:
+            nodeCrateGiveKey(loop-player, {_crate}, arg-2)
+            play sound "entity.experience_orb.pickup" with volume 1 and pitch 1.25 to loop-player
+
+        set {_display} to nodeCrateDisplay({_crate})
+        broadcast "&6&lKEYALL &8» &fEveryone &7received &f%arg-2%x %{_display}% &fKey&7!"
+
+command /crateadmin <text> [<text>]:
+    permission: op
+    permission message: &cYou do not have permission.
+    trigger:
+        if arg-1 is "setwarp":
+            set {nodecrate::warp} to location of player
+            send "{@crates-prefix} &aCrate section warp set to your location." to player
+            stop
+
+        if arg-1 is "cleanupholograms":
+            set {_removed} to nodeCrateCleanupLegacyHolograms()
+            send "{@crates-prefix} &aRemoved old/orphaned crate holograms. &7Legacy stands found: &f%{_removed}%&7." to player
+            stop
+
+        if arg-1 is "refreshholograms":
+            nodeCrateRefreshAllHolograms()
+            send "{@crates-prefix} &aAll crate holograms refreshed." to player
+            stop
+
+        if arg-1 is "set":
+            if arg-2 is not set:
+                send "{@crates-prefix} &cUse /crateadmin set <crate> while looking at the crate block." to player
+                stop
+
+            set {_crate} to nodeCrateType(arg-2)
+            if {_crate} is "invalid":
+                send "{@crates-prefix} &cUnknown crate. Use Rift, Vortex, Ascendant, Sovereign, Multiplier or KOTH." to player
+                stop
+
+            set {_block} to targeted block of player
+            if {_block} is air:
+                send "{@crates-prefix} &cLook directly at the physical block you want to use." to player
+                stop
+
+            set {nodecrate::location::%{_crate}%} to location of {_block}
+
+            set block at {nodecrate::location::%{_crate}%} to beacon
+
+            nodeCrateRefreshHologram({_crate})
+
+            set {_display} to nodeCrateDisplay({_crate})
+            send "{@crates-prefix} &aPhysical %{_display}% &aset successfully." to player
+            stop
+
+        if arg-1 is "remove":
+            if arg-2 is not set:
+                send "{@crates-prefix} &cUse /crateadmin remove <crate>." to player
+                stop
+
+            set {_crate} to nodeCrateType(arg-2)
+            if {_crate} is "invalid":
+                send "{@crates-prefix} &cUnknown crate." to player
+                stop
+
+            set {_oldLoc} to {nodecrate::location::%{_crate}%}
+
+            nodeCrateClearHologram({_crate})
+
+            if {_oldLoc} is set:
+                execute console command "execute positioned %x-coordinate of {_oldLoc}% %y-coordinate of {_oldLoc}% %z-coordinate of {_oldLoc}% run kill @e[type=minecraft:armor_stand,tag=nodecrate_hologram,distance=..4]"
+
+            delete {nodecrate::location::%{_crate}%}
+            delete {nodecrate::hologram::%{_crate}%::*}
+            delete {nodecrate::hologramtitle::%{_crate}%}
+
+            set {_display} to nodeCrateDisplay({_crate})
+            send "{@crates-prefix} &cRemoved physical %{_display}%&c and cleared its hologram." to player
+            stop
+
+        send ""
+        send "&6&lNODE CRATES ADMIN"
+        send "&f/crateadmin set <crate> &8- &7Set looked-at physical crate"
+        send "&f/crateadmin remove <crate> &8- &7Remove physical crate"
+        send "&f/crateadmin setwarp &8- &7Set /crates teleport location"
+        send "&f/crateadmin refreshholograms &8- &7Refresh every hologram"
+        send "&f/crateadmin cleanupholograms &8- &7Remove stuck/orphaned crate holograms"
+        send ""
+        send "&f/cratekey <player> <crate> <amount>"
+        send "&f/cratekeyall <crate> <amount>"
+        send ""
+        send "&7Crates: Rift, Vortex, Ascendant, Sovereign, Multiplier, KOTH"
+        send ""
