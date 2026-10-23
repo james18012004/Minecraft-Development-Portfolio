@@ -1,0 +1,1262 @@
+options:
+	prefix: &a&lLarkus &7»&a&o
+	ver: 1.99
+command valuelog [<player>]:
+	permission: staff.*
+	aliases: lv
+	trigger:
+		if arg is set:
+			wait 5 ticks
+			loop 15 times:
+				add 1 to {_s}
+				set {_y1} to y-coord of arg
+				set {_z1} to z-coord of arg
+				set {_x1} to x-coord of arg
+				wait 1 tick
+				set {_y2} to y-coord of arg
+				set {_z2} to z-coord of arg
+				set {_x2} to x-coord of arg
+				send " VALUE SAMPLE %{_s}% %arg% Y: %difference between {_y1} and {_y2}% / Z: %difference between {_z1} and {_z2}% / X: %difference between {_x1} and {_x2}% "
+		if arg is not set:
+			wait 33 ticks
+			loop 15 times:
+				add 1 to {_s}
+				set {_y1} to y-coord of player
+				set {_z1} to z-coord of player
+				set {_x1} to x-coord of player
+				wait 1 tick
+				set {_y2} to y-coord of player
+				set {_z2} to z-coord of player
+				set {_x2} to x-coord of player
+				send " VALUE SAMPLE %{_s}% %arg% Y: %difference between {_y1} and {_y2}% / Z: %difference between {_z1} and {_z2}% / X: %difference between {_x1} and {_x2}% "
+
+	
+	
+	
+
+on join:
+	delete {CancelCheck::%player%}
+	wait 5 seconds
+	set {CancelCheck::%player%} to 1
+on command:
+	player is op
+	command contains "sk" or "skript" or "larkus" or "reload"
+	loop all players:
+		delete {CancelCheck::%loop-player%}
+		wait 5 seconds
+		set {CancelCheck::%loop-player%} to 1
+
+on any move:
+	{CancelCheck::%player%} is 1
+	loop blocks in radius 2 of player:
+		if loop-block is slime block or fence or cobweb or cobblestone wall or trapdoor or vine or ladder:
+			set {lasttogglefly::%player%} to now
+		if loop-block is water or lava:
+			set {_liquid} to true
+	set {L2P.getFrom::%player%} to {L2P.getTo::%player%}
+	set {L2P.getTo::%player%} to player's location
+	set {testmove::%player%} to now
+	IsNormal(player) is true
+#	broadcast "event is set off"	
+	if difference between {Lite.LastDamage::%player%} and now >= 10 ticks:
+		SpeedA(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		SpeedB(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		SpeedAL2P(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		SpeedBL2P(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		SpeedCL2P(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		SpeedTestL2P(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		BadPacketsA(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		FlightA(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		FlightL2P(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		FlightB(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		#FlightOld(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%}) if {_liquid} is not set
+	NoFallA(player)
+	JesusA(player)
+	JesusB(player)
+
+
+
+every 60 seconds:
+	VLReset()
+
+function VLReset():
+	set {Lite.Checks::*} to "Speed (A)" and "Motion (ATest3)" and "Speed (test)" and "Speed (B)" and "Timer" and "Flight (A)" and "Flight (B)" and "Flight (C)" and "Speed (C)" and "Speed (D)" and "Bad Packets (A)" and "Speed (speedlimit)" and "Speed (friction)" and "Speed (test)" and "NoFall (B)" and "Speed (TestNew)" and "Motion (ATest2)"
+	loop {Lite.Checks::*}:
+		delete {L2P.VL.%loop-value%::*}
+		delete {L2P.Threshold.%loop-value%::*}
+	set {Larkus.Checks::*} to "A" and "AA" and "TA" and "FC" and "FL2P"
+	loop {Larkus.Checks::*}:
+		delete {L2PLarkus.%loop-value-2%::*}
+		delete {Larkus::NoSlow::*}
+on join:
+	set {Lite.LastDamage::%player%} to now
+	set {Lite.Alerts::%player%} to true if player has permission "staff.*"
+on damage of player:
+	damage cause is attack
+	victim is not attacker
+	set {Lite.LastDamage::%victim%} to now
+every 5 minutes in "world":
+	broadcast "&a&oThis server is protected by &a&lLarkusAC." in all worlds
+	broadcast "&a&lLarkusAC&a&o &7»&a&o has banned a total of %{acbans}% hackers!" in all worlds
+	wait 1 minute
+	broadcast "&a&lLarkusAC&a&o &7» &c&oAny Clicking method that exceeds 16 cps is disallowed!"
+
+function atBlock(p: player) :: boolean:
+	set {_l} to location of {_p}
+	loop 4 times:
+		return true if block at {_l} is not air
+		return true if block 0.3 meters north of {_l} is not air
+		return true if block 0.3 meters south of {_l} is not air
+		return true if block 0.3 meters east of {_l} is not air
+		return true if block 0.3 meters west of {_l} is not air
+		return true if block 0.3 meters north east of {_l} is not air
+		return true if block 0.3 meters south west of {_l} is not air
+		return true if block 0.3 meters south east of {_l} is not air
+		return true if block 0.3 meters north west of {_l} is not air
+		add 0.6 to y coord of {_l}
+	return false
+function Ground(p: player) :: boolean:
+	set {_l} to location under {_p}
+	return true if block at {_l} is not air
+	return true if block 0.3 meters north of {_l} is not air
+	return true if block 0.3 meters east of {_l} is not air
+	return true if block 0.3 meters west of {_l} is not air
+	return true if block 0.3 meters north east of {_l} is not air
+	return true if block 0.3 meters south west of {_l} is not air
+	return true if block 0.3 meters south east of {_l} is not air
+	return true if block 0.3 meters north west of {_l} is not air
+	set {_l} to location 0.49 meters under {_p}
+	return true if block at {_l} is not air
+	return true if block 0.3 meters north of {_l} is not air
+	return true if block 0.3 meters south of {_l} is not air
+	return true if block 0.3 meters east of {_l} is not air
+	return true if block 0.3 meters west of {_l} is not air
+	return true if block 0.3 meters north east of {_l} is not air
+	return true if block 0.3 meters south west of {_l} is not air
+	return true if block 0.3 meters south east of {_l} is not air
+	return true if block 0.3 meters north west of {_l} is not air
+	return false
+
+function larkusalert(p: player, i: text, t: text, ver: text):
+	if {alerts} = true:
+		set {player} to {_p}
+		set {cheat} to {_i}
+		#send "Larkus *%{player}%* has just flagged for **%{cheat}%** Ping: %{player}'s ping%" to channel with id "763609924169105429" with "ElectrokMC Network"
+		if {_ver} is "Larkus":
+			if {lsalert} = false:
+				{larkusalert} is not set
+				send "{@prefix}&r &c%{player}% &a&ofailed &c&o%{cheat}% &7Type: &cL2P &7Ping: &c%{_p}'s ping%" to all players where [input has permission "staff.*"]
+				send "{@prefix}&r &c%{player}% &a&ofailed &c&o%{cheat}% &7Type: &cL2P &7Ping: &c%{_p}'s ping%" to {lurk::*}
+				set {larkusalert} to true
+				wait 1 tick
+				clear {larkusalert}
+			if {lsalert} = true:
+				broadcast "{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%"
+		if {_ver} is "LarkusReal":
+			if {lsalert} = false:
+				{larkusalert} is not set
+				send "{@prefix}&r &c%{player}% &a&ofailed &c&o%{cheat}% &7Type: &cC &7Ping: &c%{_p}'s ping%" to all players where [input has permission "staff.*"]
+				send "{@prefix}&r &c%{player}% &a&ofailed &c&o%{cheat}% &7Type: &cC &7Ping: &c%{_p}'s ping%" to {lurk::*}
+				set {larkusalert} to true
+				wait 1 tick
+				clear {larkusalert}
+			if {lsalert} = true:
+				broadcast "{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%"
+#function Alert(p: player, c: text, m: integer):
+#	#add 1 to {L2P.VL.%{_p}%::%{_p}%}
+#	#if {_c} is not "Timer" or "Timer2":
+#		#add 1 to {L2PLarkus::%{_p}%}
+#	# send "Larkus %{_p}% failed %{_c}% Type: L2P Ping: %{_p}'s ping%" to channel with id "763609924169105429" with "ElectrokMC Network"
+#	if {_c} is not "Flight":
+#		larkusalert({_p}, "%{_c}%", "L2P", "Larkus")
+#	if {_c} is "Flight":
+#		larkusalert({_p}, "%{_c}%", "Test", "LarkusReal")
+#	#send "&5[Lite] &f%{_p}% &7failed &f%{_c}% &e(x%{L2P.VL.%{_p}%::%{_p}%}%&e/%{_m}%&e) &e(Ping: %ping of {_p}%&ems)" to loop-player
+#	{L2P.VL.%{_p}%::%{_p}%} >= {_m}
+#	set {L2P.VL.%{_p}%::%{_p}%} to 0
+# Commands #
+
+on damage:
+	{larkus::testmode} = true
+	heal victim
+on connect:
+	if {larkuslogs::%player%::*} is not set:
+		set {larkuslogs::%player%::*} to "&aNo Logs Found"
+# MISC
+on flight toggle:
+	set {anticheat::%uuid of player%::lastFlight} to now
+
+on join:
+	clear {anticheat::%uuid of player%::lastDistY}
+	clear {anticheat::%uuid of player%::distY}
+	clear {anticheat::%uuid of player%::lastYCoord}
+	clear {anticheat::%uuid of player%::yCoord}
+	clear {anticheat::%uuid of player%::accel}
+	set {anticheat::%uuid of player%::lastFlight} to now
+	set {anticheat::%uuid of player%::preventTime} to now
+Function NoFallA(p: player):
+	IsNormal({_p}) is true
+	block under {_p} is air
+	block under {_p} is not slime block or fence or cobblestone wall
+	loop blocks in radius 2 of {_p}:
+		if loop-block is slime block or fence or cobweb or cobblestone wall or trapdoor or vine or ladder:
+			stop
+	if isAirborne2({_p}):
+		{_p} is on ground
+		alert({_p}, "NoFall", "A", "Larkus")
+		add 1 to {nofall::%{_p}%}
+		if {nofall::%{_p}%} >= 5:
+			autoban({_p}, "NoFall (A)")
+# ANTI RELOAD FALSE ALERTS
+on command:
+	player is op
+	if command contains "sk":
+		send "&aLarkus is now disabled! &7(Anti-Reload)"
+		set {alerts} to false
+		loop 60 times:
+			wait 1 tick
+			loop all players:
+				clearvar(loop-player)
+				set {Lite.Checks::*} to "Speed (A)" and "Speed (B)" and "Timer" and "Flight (A)" and "Flight (B)" and "Flight (C)" and "Speed (C)" and "Speed (D)" and "Bad Packets (A)"
+			loop {Lite.Checks::*}:
+				delete {L2P.VL.%loop-value-2%::*}
+				delete {L2P.Threshold.%loop-value-2%::*}
+			set {Larkus.Checks::*} to "A" and "AA" and "TA" and "FC" and "FL2P"
+			#loop {Larkus.Checks::*}:
+				#delete {L2PLarkus.%loop-value%::*}
+		wait 5 seconds
+		set {alerts} to true
+		send "&aLarkus is now enabled! &7(Anti-Reload)"
+
+on damage:
+	if projectile is set:
+		set {lasttogglefly::%victim%} to now
+on join:
+	set {cancely::%player%} to now		
+on join:
+	set {lasttogglefly::%player%} to now
+on flight toggle:
+	set {lasttogglefly::%player%} to now
+
+on join:
+	if player has the permission "staff.*":
+		wait 7 ticks
+		remove player from {staffmsg::*}
+		add player to {staffmsg::*}
+		wait 7 ticks
+		send "&aAlerts toggled on!"
+every 3 minutes:
+	loop all players:
+		clearvar(loop-player)
+
+function clearvar(p: player):
+	loop all players:
+		clear {reach::%loop-player's uuid%}
+		clear {flightalerts::%loop-player's uuid%}
+		clear {4reach::%loop-player's uuid%}
+		clear {autoclick::%loop-player's uuid%}
+		clear {nofall::%loop-player%}
+		clear {reachc::%loop-player%}
+		clear {speeda::*}
+		clear {speedb::*}
+		delete {yport::*}
+		delete {nofallb::*}
+		delete {nofallc::*}
+# FUNCTIONS
+function DisToGround(p: player) :: number:
+	loop 256 times:
+		if block loop-numbers below {_p} is not air:
+			set {_A} to loop-numbers
+			remove 1 from {_A}
+			set {_D} to {_p}'s y-coord - {_A}
+			set {_Cw} to abs({_D} - floor({_D}))
+			add {_A} to {_Cw}
+			return {_Cw}
+			exit 1 loop
+function isAirborne(p: player) :: boolean:
+	loop all blocks in radius 2 around {_p}:
+		if loop-block is not air:
+			return false
+	if block 2 under {_p} is air:
+		return true
+function blockcheck(p: player) :: boolean:
+	set {_loc} to location of {_p}
+	if block 1 west 1 north of {_loc} is air:
+		if block 1 west 1 south of {_loc} is air:
+			if block 1 east 1 north of {_loc} is air:
+				if block 1 east 1 south of {_loc} is air:
+					return false
+	if block 1 west 1 north of {_loc} is not air:
+		return true
+		if block 1 west 1 south of {_loc} is not air:
+			return true
+			if block 1 east 1 north of {_loc} is not air:
+				return true
+				if block 1 east 1 south of {_loc} is not air:
+					return true
+		
+function isAirborne2(p: player) :: boolean:
+	loop all blocks in radius 5 around {_p}:
+		if loop-block is not air:
+			return false
+	return true
+function isAirborne3(p: player) :: boolean:
+	loop all blocks in radius 1 around {_p}:
+		if loop-block is not air:
+			return false
+	return true
+function AboveBlock(p: Location, b: Item) :: boolean:
+	set {_c} to block 0.1 meter below {_p}
+	if block west {_c} is {_b}:
+		if block north {_c} is {_b}:
+			if block south {_c} is {_b}:
+				if block east {_c} is {_b}:
+					if block southwest {_c} is {_b}:
+						if block northwest {_c} is {_b}:
+							if block southeast {_c} is {_b}:
+								if block northeast {_c} is {_b}:
+									if {_c} is {_b}:
+										return true
+
+function isOnLadder(p: player) :: boolean:
+	loop all blocks in radius 2 around {_p}:
+		if loop-block is ladder:
+			return true
+	return false
+function NearHalf(p: player) :: boolean:
+    set {_halfBlocks::*} to any stairs, any slabs and any trapdoor and ladder
+    set {_halfBlockY::*} to "19" and ".5"
+    set {_playerYHalf} to the last 2 characters of "%y-coordinate of {_p}%"
+
+    if {_halfBlocks::*} contains block at {_p}:
+        if {_halfBlockY::*} contains {_playerYHalf}:
+            return true
+    else:
+        loop blocks in radius 2 around location of {_p}:
+            if {_halfBlocks::*} contains loop-block:
+                if {_halfBlockY::*} contains {_playerYHalf}:
+                    return true
+    return false
+on join:
+	if player has the permission "staff.*":
+		add player to {staffmsg::*}
+on quit:
+	loop 5 times:
+		remove player from {staffmsg::*}
+
+
+on join:
+	if {lsalert} is not set:
+		set {lsalert} to true
+	if {autoban} is not set:
+		set {autoban} to false
+	if {kick} is not set:
+		set {kick} to false
+
+function autoban(p: player, hack: text):
+	if {autoban} = true:
+		if {staffmsg::*} does not contain {_p}:
+			set {banr::%{_p}%} to {_hack}
+			broadcast "{@prefix}&a i have removed &c%{_p}%&a from the server for Unfair Advantage"
+			#broadcast "&aLarkus &fhas removed &a%{_p}% &ffrom the server!"
+			add 1 to {acbans}
+			set {_r} to 1 or 2 or 3
+			if {_r} = 1:
+				make console execute command "tempbanip %{_p}% 10d {@prefix} You were caught using a Hacked Client by LarkusAC"
+			alert({_p}, "AutoBan", "%{_hack}%", "Larkus")
+			make console execute command "tempban %{_p}% 10d {@prefix} You were caught using a Hacked Client by LarkusAC"
+			set {player} to {_p}
+			set {cheat} to {_hack}
+			{player} is online
+			set {autoban} to false
+			wait 2 seconds
+			set {autoban} to true
+		if {staffmsg::*} contains {_p}:
+			send "{@prefix}&r &ai tried to ban &c%{_p}%&a for %{_hack}%&a but failed!" to all players where [input has permission "staff.*"]
+		if {lurk::*} contains {_p}:
+			send "{@prefix}&r &ai tried to ban &c%{_p}%&a but they have lurk permissions!" to all players where [input has permission "staff.*"]
+function kick(p: player, hack: text):
+	if {kick} = true:
+		if {staffmsg::*} does not contain {_p}:
+			broadcast "{@prefix}&a i have kicked &c%{_p}%&a for cheating!"
+			add 1 to {ackicks}
+			make console execute command "kick %{_p}% {@prefix} you have been &ckicked&a for cheating"
+			set {player} to {_p}
+			set {cheat} to {_hack}
+			{player} is online
+			set {kick} to false
+			wait 2 seconds
+			set {kick} to true
+		if {staffmsg::*} contains {_p}:
+			send "{@prefix}&r &ai tried to kick &c%{_p}%&a for %{_hack}%&a but failed!" to all players where [input has permission "staff.*"]
+function IsInAir(p: player) :: boolean:
+	loop blocks in radius 3 of {_p}:
+		if loop-block is not air:
+			return false
+	return true
+function IsNotOnEdge(p: player) :: boolean:
+	if block 1 down 1 east of {_p} is air:
+		if block 1 down 1 west of {_p} is air:
+			if block 1 down 1 south of {_p} is air:
+				if block 1 down 1 north of {_p} is air:
+					if block 1 down 1 north 1 east of {_p} is air:
+						if block 1 down 1 north 1 west of {_p} is air:
+							if block 1 down 1 south 1 west of {_p} is air:
+								if block 1 down 1 south 1 east of {_p} is air:
+									return true
+	return false
+function IsNormal(p: player) :: boolean:
+	set {_uuid} to uuid of {_p}
+	if {_p}'s gamemode is survival or adventure:
+		if {_p} is not flying:
+			{_p} does not have swiftness:
+				return true
+	return false
+function isInWater(p: player) :: boolean:
+	if block at {_p} is water:
+		return true
+	return false
+
+
+function alert(p: player, i: text, t: text, ver: text):
+	if {_p} is not "ThatOneTqnk":
+		set {player} to {_p}
+		set {cheat} to {_i}
+		add "&c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%" to {larkuslogs::%{_p}%::*}
+		add "{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%" to {larkuslog::%{_p}%::*}
+		#discordalert("%{player}%", "%{cheat}%")
+		if {_ver} is set:
+			if {lsalert} = false:
+				{larkusalert} is not set
+				loop all players:
+					loop-player has the permission "staff.*"
+					{alerts::%loop-player%} is not set
+					#send "{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%" to loop-player
+					message formatted "<tooltip:&a&lLarkus Information>{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%" to loop-player
+				#set {larkusalert} to true
+				wait 1 tick
+				clear {larkusalert}
+			if {lsalert} = true:
+				message formatted "<tooltip:&a&lLarkus Information>{@prefix}&r &c%{_p}% &a&ofailed &c&o%{_i}% &7Type: &c%{_t}% &7Ping: &c%{_p}'s ping%" to all players
+		if {_i} = "Speed":
+			if {_t} = "L2P-A":
+				add 1 to {L2PLarkus.A::%{_p}%}
+				if {L2PLarkus.A::%{_p}%} = 5:
+					delete {L2PLarkus.A::%{_p}%}
+					autoban({_p}, "Speed (L2P-A)")
+			if {_t} = "L2P-AA":
+				add 1 to {L2PLarkus.AA::%{_p}%}
+				if {L2PLarkus.AA::%{_p}%} = 6:
+					delete {L2PLarkus.AA::%{_p}%}
+					autoban({_p}, "Speed (L2P-AA)")
+		if {_i} = "Flight":
+			if {_t} = "L2P":
+				add 1 to {L2PLarkus.FA::%{_p}%}
+				if {L2PLarkus.FA::%{_p}%} = 5:
+					delete {L2PLarkus.A::%{_p}%}
+					autoban({_p}, "Flight (L2P)")
+			if {_t} = "A":
+				add 1 to {L2PLarkus.FC::%{_p}%}
+				if {L2PLarkus.FC::%{_p}%} = 3:
+					delete {L2PLarkus.FC::%{_p}%}
+					autoban({_p}, "Flight (A)")
+			if {_t} = "B":
+				add 1 to {L2PLarkus.FC::%{_p}%}
+				if {L2PLarkus.FC::%{_p}%} = 6:
+					delete {L2PLarkus.FC::%{_p}%}
+					autoban({_p}, "Flight (B)")
+function isAboveBlock(p: Location, b: Item) :: boolean:
+	set {_c} to block 0.1 meter below {_p}
+	if block west {_c} is {_b}:
+		if block north {_c} is {_b}:
+			if block south {_c} is {_b}:
+				if block east {_c} is {_b}:
+					if block southwest {_c} is {_b}:
+						if block northwest {_c} is {_b}:
+							if block southeast {_c} is {_b}:
+								if block northeast {_c} is {_b}:
+									if {_c} is {_b}:
+										return true
+	return false
+function distXZ(p: player) :: number:
+    set {_DistX} to x coord of {lastmove::%{_p}%} - x coord of {currentmove::%{_p}%}
+    set {_DistZ} to z coord of {lastmove::%{_p}%} - z coord of {currentmove::%{_p}%}
+    return ({_DistX} * {_DistX}) + ({_DistZ} * {_DistZ})
+
+function isAtBlock(p: Location, b: Item) :: boolean:
+	set {_c} to block 0.1 meter above {_p}
+	if block west {_c} is {_b}:
+		if block north {_c} is {_b}:
+			if block south {_c} is {_b}:
+				if block east {_c} is {_b}:
+					if block southwest {_c} is {_b}:
+						if block northwest {_c} is {_b}:
+							if block southeast {_c} is {_b}:
+								if block northeast {_c} is {_b}:
+									if {_c} is {_b}:
+										return true
+	return false
+on death:
+	set {lasttogglefly::%attacker%} to now
+on place:
+	event is cancelled
+	set {lasttogglefly::%player%} to now
+# Combat
+
+
+
+	
+function hypot2(a: number, b: number) :: number:
+    return {_a}*{_a} + {_b}*{_b}
+
+function addThreshold(p: player, c: text, a: integer, m: integer, t: boolean) :: boolean:
+	loop {_a} times:
+		add 1 to {L2P.Threshold.%{_c}%::%{_p}%}
+		{L2P.Threshold.%{_c}%::%{_p}%} >= {_m}
+		set {L2P.Threshold.%{_c}%::%{_p}%} to 0 if {_t} is true
+		return true
+function removeThreshold(p: player, c: text, a: integer):
+	loop {_a} times:
+		{L2P.Threshold.%{_c}%::%{_p}%} > 0
+		remove 1 from {L2P.Threshold.%{_c}%::%{_p}%}
+function resetThreshold(p: player, c: text):
+	set {L2P.Threshold.%{_c}%::%{_p}%} to 0
+function getTier(p: player, e: text) :: integer:
+	return {_effect}
+function onStairs(p: player) :: boolean:
+	set {_l} to location at {_p}
+	remove 0.25 from y coord of {_l}
+	return true if "%block at {_l}%" contains "stair"
+	return true if "%block 0.3 meters north of {_l}%" contains "stair"
+	return true if "%block 0.3 meters south of {_l}%" contains "stair"
+	return true if "%block 0.3 meters east of {_l}%" contains "stair"
+	return true if "%block 0.3 meters west of {_l}%" contains "stair"
+	return true if "%block 0.3 meters north east of {_l}%" contains "stair"
+	return true if "%block 0.3 meters south west of {_l}%" contains "stair"
+	return true if "%block 0.3 meters south east of {_l}%" contains "stair"
+	return true if "%block 0.3 meters north west of {_l}%" contains "stair"
+	return false
+function underBlock(p: player) :: boolean:
+	set {_l} to location at {_p}
+	add 2 to y coord of {_l}
+	return true if block at {_l} is not air
+	return true if block 0.3 meters north of {_l} is not air
+	return true if block 0.3 meters south of {_l} is not air
+	return true if block 0.3 meters east of {_l} is not air
+	return true if block 0.3 meters west of {_l} is not air
+	return true if block 0.3 meters north east of {_l} is not air
+	return true if block 0.3 meters south west of {_l} is not air
+	return true if block 0.3 meters south east of {_l} is not air
+	return true if block 0.3 meters north west of {_l} is not air
+	return false
+function onIce(p: player) :: boolean:
+	set {_l} to location under {_p}
+	return true if block at {_l} is ice or packed ice
+	return true if block 0.3 meters north of {_l} is ice or packed ice
+	return true if block 0.3 meters south of {_l} is ice or packed ice
+	return true if block 0.3 meters east of {_l} is ice or packed ice
+	return true if block 0.3 meters west of {_l} is ice or packed ice
+	return true if block 0.3 meters north east of {_l} is ice or packed ice
+	return true if block 0.3 meters south west of {_l} is ice or packed ice
+	return true if block 0.3 meters south east of {_l} is ice or packed ice
+	return true if block 0.3 meters north west of {_l} is ice or packed ice
+	return false
+function hypot(a: number, b: number) :: number:
+	return sqrt({_a}^2 + {_b}^2)
+
+
+						
+function FlightL2P(p: player, getFrom: location, getTo: location):
+	difference between {lasttogglefly::%{_p}%} and now >= 3 seconds
+	block at {_p} is air
+	set {_LastDistY} to {Lite.FlightA.DistY::%{_p}%}
+	set {Lite.FlightA.LastDistY::%{_p}%} to {Lite.FlightA.DistY::%{_p}%}
+	set {MathGlide::%{_p}%} to {Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}
+	set {Lite.FlightA.DistY::%{_p}%} to y coord of {_getFrom} - y coord of {_getTo}
+	set {_diff} to -0.07840000152587 + difference between {_LastDistY} * 0.9800000190734863 and {Lite.FlightA.DistY::%{_p}%}
+	if abs({_diff}) > 0.00000001:
+		alert({_p}, "Flight", "L2P", "Larkus") if addThreshold({_p}, "Flight (L2P)", 2, 12, true) is true
+	resetThreshold({_p}, "Flight (L2P)") if Ground({_p}) is true
+	resetThreshold({_p}, "Flight (L2P)") if abs({_diff}) <= 0.00000001
+			
+function FlightA(p: player, getFrom: location, getTo: location):
+	difference between {lasttogglefly::%{_p}%} and now >= 3 seconds
+	set {InAirTime::%{_p}%} to 0 if Ground({_p}) is true
+	set {InAirTime::%{_p}%} to 0 if atBlock({_p}) is true
+	set {InAirTime2::%{_p}%} to 0 if Ground({_p}) is true
+	set {InAirTime2::%{_p}%} to 0 if atBlock({_p}) is true
+	Ground({_p}) is false
+	atBlock({_p}) is false
+	if y coord of {_getTo} >= y coord of {_getFrom}:
+		add 1 to {InAirTime::%{_p}%}
+	if y coord of {_getTo} < y coord of {_getFrom}:
+		add 1 to {InAirTime2::%{_p}%}
+	#broadcast "%{InAirTime::%{_p}%}% %{_p}%"
+	if {InAirTime::%{_p}%} >= 10:
+		alert({_p}, "Flight", "A", "Larkus") if addThreshold({_p}, "Flight (A)", 2, 6, true) is true
+	if {InAirTime::%{_p}%} is above 0:
+		set {LastAirTime::%{_p}%} to now
+	else:
+		resetThreshold({_p}, "Flight (A)")
+
+function FlightOld(p: player, getFrom: location, getTo: location):
+    difference between {lasttogglefly::%{_p}%} and now >= 3 seconds
+    IsInAir({_p}) is true
+    stop if {Lite.FlightA.DistY::%{_p}%} = 0
+    stop if {Lite.FlightA.LastDistY::%{_p}%} = 0
+    #roadcast "%{_p}% / %{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}% 9 %{LastFlightMath::%{_p}%}% / %{Lite.FlightA.DistY::%{_p}%}% / %{Lite.FlightA.LastDistY::%{_p}%}% / %y coord of {_getFrom}% / %y coord of {_getTo}%"
+    if abs({LastFlightMath::%{_p}%} - ({Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%})) < 0.1:
+        alert({_p}, "Flight", "Old", "Larkus")
+    add {LastFlightMath::%{_p}%} to {LastFlightMathList::%{_p}%::*}
+    set {LastFlightMath::%{_p}%} to {Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}
+
+import:
+    org.bukkit.event.player.PlayerMoveEvent
+
+on PlayerMoveEvent:
+    set {_player} to event.getPlayer()
+    add 1 to {L2P::TimerB::Moves::%{_player}%}
+    if {L2P::TimerB::Moves::%{_player}%} >= 20:
+        set {L2P::TimerB::Moves::%{_player}%} to 0
+        set {_time} to unix timestamp of now - {L2P::TimerB::MoveTime::%{_player}%}
+        set {L2P::TimerB::MoveTime::%{_player}%} to unix timestamp of now
+        {_time} > 0
+        if {_time} < 0.99:
+            add 1 to {L2P::TimerBB::Threshold::%{_player}%}
+            {L2P::TimerBB::Threshold::%{_player}%} > 4
+            alert({_player}, "Timer", "L2P-A", "Larkus")
+        else:
+            set {L2P::TimerBB::Threshold::%{_player}%} to 0
+
+function FlightB(p: player, getFrom: location, getTo: location):
+	#{_p} = "contribe"
+	set {Lite.FlightB.YInitialVelocity::%{_p}%} to y of velocity of {_p} if {InAirTime::%{_p}%} = 1
+	set {_predicted} to (3.92 + ({Lite.FlightB.YInitialVelocity::%{_p}%})) * 0.98^{InAirTime::%{_p}%} - 3.92
+	set {_lastpredicted} to {Lite.FlightB.PredictedVelocity::%{_p}%}
+	set {Lite.FlightB.PredictedVelocity::%{_p}%} to {_predicted}
+	#broadcast "%{_p}% / %{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}% / %{InAirTime2::%{_p}%}% / %{_predicted}%--%{_lastpredicted}%"
+	set {CurrentYPred::%{_p}%} to {Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%} 
+	if {InAirTime2::%{_p}%} >= 10:
+		if {_predicted} is above 0:
+			alert({_p2}, "Flight", "Test-1", "Larkus")
+		if {_predicted} is not {_lastpredicted}:
+			alert({_p2}, "Flight", "Test-2", "Larkus")
+	if {InAirTime2::%{_p}%} = 10:
+		{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%} is below 1.2
+		alert({_p}, "Flight", "B", "Larkus")
+	if {InAirTime2::%{_p}%} = 15:
+		{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%} is below 1.8
+		alert({_p}, "Flight", "B", "Larkus")
+	if {InAirTime2::%{_p}%} = 20:
+		{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%} is below 2.4
+		alert({_p}, "Flight", "B", "Larkus")
+	if {InAirTime2::%{_p}%} >= 30:
+		{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%} is below 3.4
+		alert({_p}, "Flight", "B", "Larkus")
+	set {_set} to {Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}
+	#alert({_p}, "Speed", "C", "Larkus") if {_set} = -0
+	#broadcast "%{_p}% / %{Lite.FlightA.DistY::%{_p}%} + {Lite.FlightA.LastDistY::%{_p}%}% / %{InAirTime2::%{_p}%}%"
+	set {_r} to 1 or 2
+	removeThreshold({_p}, "Flight (B)", 1) if {_r} = 2
+
+Function JesusA(p: player):
+	loop all blocks in radius 2 around {_p}:
+		if loop-block is a lily pad:
+			stop
+	{_p} is not flying
+	{_p}'s gamemode is not creative or spectator
+	isInWater({_p}) is false
+	block below {_p} is water
+	block 1 east of block below {_p} is water
+	block 1 west of block below {_p} is water
+	block 1 south the block below {_p} is water
+	block 1 north of block below {_p} is water
+	block 1 east 1 north of block below {_p} is water
+	block 1 west 1 north of block below {_p} is water
+	block 1 east 1 south of block below {_p} is water
+	block 1 west 1 south of block below {_p} is water
+	if {_p} is on ground:
+		alert({_p}, "Jesus", "A", "Larkus")
+
+											
+on jump:
+	set {lastjump::%player%} to now
+Function JesusB(p: player):
+	difference between {lastjump::%{_p}%} and now < 0.3 second
+	set {_u} to uuid of {_p}
+	if isAtBlock({_p}, air):
+		if isAboveBlock({_p}, water):
+			alert({_p}, "Jesus", "B", "Larkus")
+
+#function SpeedA(p: player, getFrom: location, getTo: location):
+#	set {_info1} to difference between z coord of {_getFrom} and z coord of {_getTo}
+#	set {_info2} to difference between x coord of {_getFrom} and x coord of {_getTo}
+#	set {_distY} to y coord of {_getTo} - y coord of {_getFrom}
+#	if {InAirTime2::%{_p}%} = 1:
+#		if underBlock({_p}) is true:
+#			stop
+#	stop if onStairs({_p}) is true
+#	stop if NearHalf({_p}) is true
+#	difference between {lastteleport::%{_p}%} and now >= 1 second
+#	if {_distY} > 0.5:
+#		{_distY} < 2
+#		alert({_p}, "Speed", "AA (%{_distY}%)", "Larkus") if addThreshold({_p}, "Speed (jump)", 2, 10, true) is true
+
+#function SpeedB(p: player, getFrom: location, getTo: location):
+#	difference between {lastteleport::%{_p}%} and now >= 1 second
+#	set {_x} to x coord of {_getto} - x coord of {_getfrom}
+#	set {_z} to z coord of {_getto} - z coord of {_getfrom}
+#	set {_offset} to hypot({_x}, {_z})
+#	set {_diff} to difference between {_offset} and {PValue::%{_p}%}
+#	set {_gt} to true if Ground({_p}) is true
+#	set {_gt} to false if Ground({_p}) is false
+#	set {_groundtest} to true if {_gt} = {Ground::%{_p}%}
+#	set {_groundtest} to false if {_gt} != {Ground::%{_p}%}
+#	set {Ground::%{_p}%} to true if Ground({_p}) is true
+#	set {Ground::%{_p}%} to false if Ground({_p}) is false
+#	{_offset} is not 0
+#	broadcast "&c&lDEBUG FRICTION &8--> &a%{_p}% &7/ &a%{_offset}% &7/ &a%{PValue::%{_p}%}% &7/ &a%{_diff}% &7/ &a%{_groundtest}%"
+#	set {PValue::%{_p}%} to {_offset} * 0.91
+#	set {PreviousSpeed::%{_p}%} to {_offset}
+#	{_diff} > 0.33
+#	alert({_p}, "Speed", "B", "Larkus")
+	# if addThreshold({_p}, "Speed (friction)", 1, 2, true) is true
+	
+	
+function SpeedA(p: player, getFrom: location, getTo: location):
+	#{_P} = "contribe" or "Mauryzio"
+	difference between {lastteleport::%{_p}%} and now >= 1 second
+	set {_x} to x coord of {_getto} - x coord of {_getfrom}
+	set {_z} to z coord of {_getto} - z coord of {_getfrom}
+	set {_gt} to true if Ground({_p}) is true
+	set {_gt} to false if Ground({_p}) is false
+	set {_groundtest} to true if {_gt} = {Ground::%{_p}%}
+	set {_groundtest} to false if {_gt} != {Ground::%{_p}%}
+	set {Ground::%{_p}%} to true if Ground({_p}) is true
+	set {Ground::%{_p}%} to false if Ground({_p}) is false
+	set {_offset} to hypot2({_x}, {_z})
+	set {_diff} to difference between {_offset} and {PreviousSpeed::%{_p}%} * 0.91
+	set {_diff} to abs({_diff})
+	stop if onStairs({_p}) is true
+	stop if NearHalf({_p}) is true
+	set {vartest2::%{_p}%} to 0 if {vartest2::%{_p}%} is not set
+	set {vartest2::%{_p}%} to {_diff} if {_diff} > {vartest2::%{_p}%}
+	#broadcast "&c&lDEBUG &8--> &a%{_p}% &7/ &a%{_offset}% &7/ &a%{vartest2::%{_p}%}% &7/ &a%{_diff}% &7/ &a%{_groundtest}%"
+	set {PreviousSpeed::%{_p}%} to {_offset}
+	if {_diff} is between 0.188 and 0.199:
+		# terrible way to change sprint jump falses
+		#removeThreshold({_p}, "Speed (friction)", 4)
+	if {_diff} >= 0.29:
+		{_groundtest} = true
+		alert({_p}, "Speed", "Experimental-A", "Larkus") if addThreshold({_p}, "Speed (friction)", 1, 2, true) is true
+
+
+function SpeedB(p: player, getFrom: location, getTo: location):
+	set {_debug} to distance between {_getfrom} and {_getto}
+	set {_X} to x coord of {_getTo} - x coord of {_getFrom}
+	set {_Z} to z coord of {_getTo} - z coord of {_getFrom}
+	set {_y} to y coord of {_getTo} - y coord of {_getFrom}
+	set {_offset} to hypot2({_x}, {_z})
+	set {_value} to 0.38
+	set {vartest::%{_p}%} to 0 if {vartest::%{_p}%} is not set
+	set {vartest::%{_p}%} to {_offset} if {_offset} > {vartest::%{_p}%}
+	if {_p} is on ground:
+		stop if onStairs({_p}) is true
+		stop if NearHalf({_p}) is true
+		set {_value} to 0.18
+		stop if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now <= 2 seconds
+	add 0.12 to {_value} if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now <= 2 seconds
+	if {debugv::*} contains {_p}:
+		send "&c&lDEBUG &8--> &a%{_p}% &7/ &a%{_offset}% &7/ &a%{vartest::%{_p}%}% &7/&a %{_y}% &7/ &a%{_value}%" to {debugv::*}
+	if {_offset} > {_value}:
+		alert({_p}, "Speed", "B &7(%{_offset}%/%{_value}%) (%difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now%)", "Larkus") if addThreshold({_p}, "Speed (speedlimit)", 1, 2, true) is true	
+
+function SpeedBB(p: player, getFrom: location, getTo: location):
+	stop
+	if "%{_packet}%" contains "PacketPlayInEntityAction":
+		if "%{_packet}.animation%" contains "STOP_SPRINTING":
+			set {SprintState::%{_p}%} to 1
+		else if "%{_packet}.animation%" contains "START_SPRINTING":
+			set {SprintState::%{_p}%} to 2
+	set {_debug} to distance between {_getfrom} and {_getto}
+	set {_X} to x coord of {_getTo} - x coord of {_getFrom}
+	set {_Z} to z coord of {_getTo} - z coord of {_getFrom}
+	set {_y} to y coord of {_getTo} - y coord of {_getFrom}
+	set {_offset} to hypot2({_x}, {_z})
+	set {_value} to 0.38
+	set {vartest::%{_p}%} to 0 if {vartest::%{_p}%} is not set
+	set {vartest::%{_p}%} to {_offset} if {_offset} > {vartest::%{_p}%}
+	if {_p} is on ground:
+		stop if onStairs({_p}) is true
+		stop if NearHalf({_p}) is true
+		set {_value} to 0.18
+		stop if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now <= 2 seconds
+	add 0.12 to {_value} if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now <= 2 seconds
+	if {debugv::*} contains {_p}:
+		send "&c&lDEBUG &8--> &a%{_p}% &7/ &a%{_offset}% &7/ &a%{vartest::%{_p}%}% &7/&a %{_y}% &7/ &a%{_value}%" to {debugv::*}
+	if {_offset} > {_value}:
+		alert({_p}, "Speed", "B &7(%{_offset}%/%{_value}%) (%difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now%)", "Larkus") if addThreshold({_p}, "Speed (speedlimit)", 1, 2, true) is true	
+
+on any move:
+	set {_p} to player
+	block at player is not water
+	block below player is not water
+	if {_p}'s gamemode is spectator:
+		stop
+	if {_p}'s gamemode is creative:
+		stop
+	if {_p}'s gamemode is survival:
+		if {_p} is flying:
+			stop
+	IsNormal({_p}) is true
+	difference between {lasttogglefly::%{_p}%} and now >= 10 seconds
+	set {_x} to x coord of {L2P.getTo::%{_p}%} - x coord of {L2P.getFrom::%{_p}%}
+	set {_z} to z coord of {L2P.getTo::%{_p}%} - z coord of {L2P.getFrom::%{_p}%}
+	hypot({_x}, {_z})
+	set {_LastDistY} to {Lite.FlightAA.DistY::%{_p}%}
+	set {Lite.FlightAA.DistY::%{_p}%} to y coord of {L2P.getFrom::%{_p}%} - y coord of {L2P.getTo::%{_p}%}
+	set {_diff} to -0.07840000152587 + difference between {_LastDistY} * 0.9800000190734863 and {Lite.FlightAA.DistY::%{_p}%}
+	if abs({_diff}) > 0.00000001:
+		if addThreshold({_p}, "Motion (Test)", 1, 20, true) is true:
+			alert(player, "Motion", "Test", "Larkus")
+	resetThreshold({_p}, "Motion (Test)") if player is on ground
+	resetThreshold({_p}, "Motion (Test)") if abs({_diff}) <= 0.00000001 
+	
+function SpeedAL2P(p: player, getFrom: location, getTo: location):
+	send "test2" to {debu::*}
+	if {_p} is on ground:
+		{L2P::SpeedA::groundTime::%{_p}%} is not set
+		delete {L2P::SpeedA::airTime::%{_p}%}
+		set {L2P::SpeedA::groundTime::%{_p}%} to now
+	if {_p} is not on ground:
+		{L2P::SpeedA::airTime::%{_p}%} is not set
+		delete {L2P::SpeedA::groundTime::%{_p}%}
+		set {L2P::SpeedA::airTime::%{_p}%} to now
+	if underBlock({_p}) is true:
+		set {L2P::SpeedA::LastUnderBlock::%{_p}%} to now
+	if onIce({_p}) is true:
+		set {L2P::SpeedA::LastOnIce::%{_p}%} to now
+	#set {_offset} to hypot(x coord of {_getTo} - x coord of {_getFrom}, z coord of {_getTo} - z coord of {_getFrom})
+	set {_x} to x coord of {_getto} - x coord of {_getfrom}
+	set {_z} to z coord of {_getto} - z coord of {_getfrom}
+	#broadcast "%{_x}% %{_z}% %x coord of {_getTo}% %x coord of {_getFrom}% %{_p}%"
+	set {_offset} to hypot({_x}, {_z})
+	set {_limit} to 0.55
+	set {_limit} to 0.36 if difference between {L2P::SpeedA::airTime::%{_p}%} and now > 0.05 seconds
+	set {_limit} to 0.30 if difference between {L2P::SpeedA::groundTime::%{_p}%} and now > 0.2 seconds
+	set {_speedx} to 0.02
+	set {_speedx} to 0.06 if difference between {L2P::SpeedA::groundTime::%{_p}%} and now > 0.2 seconds
+	set {_limit} to 0.65 if onStairs({_p}) is true
+	set {_limit} to 0.9 if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now < 0.7 seconds
+	if difference between {L2P::SpeedA::LastOnIce::%{_p}%} and now < 1 seconds:
+		set {_limit} to 0.35 if difference between {L2P::SpeedA::groundTime::%{_p}%} and now > 0.2 seconds
+		set {_limit} to 0.65 if difference between {L2P::SpeedA::airTime::%{_p}%} and now > 0.05 seconds
+		set {_limit} to 1.3 if difference between {L2P::SpeedA::LastUnderBlock::%{_p}%} and now < 0.7 seconds
+	set {_limit} to 1.3 if difference between now and {Lite.LastDamage::%{_p}%} < 0.75 seconds
+	set {_speed} to getTier({_p}, "SPEED")
+	set {_walk} to (round(walk speed of {_p} * 100)) / 100
+	set {_limit} to {_limit} + ({_walk} * 10 * 0.33) if {_walk} > 0.2
+	set {_limit} to {_limit} + {_speed} * {_speedx}
+	if {_offset} > {_limit} * 1.75:
+		alert({_p}, "Speed", "L2P-A", "Larkus") if addThreshold({_p}, "Speed (A)", 10, 100, true) is true
+	if {_offset} > {_limit}:
+		alert({_p}, "Speed", "L2P-A", "Larkus") if addThreshold({_p}, "Speed (A)", 10, 130, true) is true
+	if {_offset} <= {_limit}:
+		removeThreshold({_p}, "Speed (A)", 1)
+	if {_limit} = 0.45:
+		removeThreshold({_p}, "Speed (A)", 1)
+
+function SpeedBL2P(p: player, getFrom: location, getTo: location):
+	difference between {Lite.LastDamage::%{_p}%} and now > 0.7 seconds
+	set {L2P::SpeedB::lastdeltaX::%{_p}%} to {L2P::SpeedB::deltaX::%{_p}%}
+	set {L2P::SpeedB::lastdeltaZ::%{_p}%} to {L2P::SpeedB::deltaZ::%{_p}%}
+	set {L2P::SpeedB::lastdeltaY::%{_p}%} to {L2P::SpeedB::deltaY::%{_p}%}
+	if {L2P::SpeedB::lastdeltaY::%{_p}%} > 0:
+		if {L2P::SpeedB::lastdeltaY::%{_p}%} < 0.002357499729924939:
+			block at {_p} is not water
+			block below {_p} is not water
+			alert({_p}, "Motion", "C", "Larkus")
+	set {L2P::SpeedB::deltaX::%{_p}%} to x coord of {_getFrom} - x coord of {_getTo}
+	set {L2P::SpeedB::deltaZ::%{_p}%} to z coord of {_getFrom} - z coord of {_getTo}
+	set {L2P::SpeedB::deltaY::%{_p}%} to y coord of {_getFrom} - y coord of {_getTo}
+	if Ground({_p}) is false:
+		if {L2P::SpeedB::lastdeltaX::%{_p}%} > 0.03:
+			set {_flagged} to true if {L2P::SpeedB::deltaX::%{_p}%} < -0.03
+		if {L2P::SpeedB::lastdeltaX::%{_p}%} < -0.03:
+			set {_flagged} to true if {L2P::SpeedB::deltaX::%{_p}%} > 0.03
+		if {L2P::SpeedB::lastdeltaZ::%{_p}%} > 0.03:
+			set {_flagged} to true if {L2P::SpeedB::deltaZ::%{_p}%} < -0.03
+		if {L2P::SpeedB::lastdeltaZ::%{_p}%} < -0.03:
+			set {_flagged} to true if {L2P::SpeedB::deltaZ::%{_p}%} > 0.03
+	if underBlock({_p}) is false:
+		if {L2P::SpeedB::lastdeltaY::%{_p}%} > 0.015:
+			set {_flagged} to true if {L2P::SpeedB::deltaY::%{_p}%} < -0.015
+		if {L2P::SpeedB::lastdeltaY::%{_p}%} < -0.015:
+			set {_flagged} to true if {L2P::SpeedB::deltaY::%{_p}%} > 0.015
+	if block at {_p} = ladder:
+		stop
+	if block below {_p} = ladder:
+		stop
+	if {_flagged} is true:
+		alert({_p}, "Speed", "A", "Larkus") if addThreshold({_p}, "Speed (B)", 10, 30, true) is true
+		stop
+	removeThreshold({_p}, "Speed (B)", 4)
+on damage:
+	damage cause is attack
+	set {L2P::LastDamaged::%victim%} to now
+function SpeedTestL2P(p: player, getFrom: location, getTo: location):
+	difference between {L2P::LastDamaged::%{_p}%} and now > 0.7 seconds
+	set {_distX} to x coord of {_getTo} - x coord of {_getFrom}
+	set {_distZ} to z coord of {_getTo} - z coord of {_getFrom}
+	set {L2P::SpeedC::LastDist::%{_p}%} to {L2P::SpeedC::Dist::%{_p}%}
+	set {L2P::SpeedC::Dist::%{_p}%} to ({_distX} * {_distX}) + ({_distZ} * {_distZ})
+	set {L2P::SpeedC::Dist::%{_p}%} to {L2P::SpeedC::Dist::%{_p}%}
+	set {_shifted} to {L2P::SpeedC::LastDist::%{_p}%} * 0.91
+	set {_equalness} to ({L2P::SpeedC::Dist::%{_p}%} - {_shifted}) * 137
+	Ground({_p}) is false
+	set {_diff} to angleDiff(yaw of {_getFrom}, yaw of {_getTo})
+	set {_max} to 1.01
+	if abs({_diff}) > 0.5:
+		abs({_diff}) < 7
+		set {_max} to 1.03
+	if {_equalness} >= {_max}:
+		alert({_p}, "Motion", "B", "Larkus") if addThreshold({_p}, "Speed (C)", 2, 16, true) is true
+		stop
+	removeThreshold({_p}, "Speed (C)", 5)
+	
+
+
+function SpeedCL2P(p: player, getFrom: location, getTo: location):
+	difference between {L2P::LastDamaged::%{_p}%} and now > 1 seconds
+	set {L2P.Speed.lastdeltaX::%{_p}%} to {L2P.Speed.deltaX::%{_p}%}
+	set {L2P.Speed.lastdeltaZ::%{_p}%} to {L2P.Speed.deltaZ::%{_p}%}
+	set {L2P.Speed.deltaX::%{_p}%} to x coord of {_getFrom} - x coord of {_getTo}
+	set {L2P.Speed.deltaZ::%{_p}%} to z coord of {_getFrom} - z coord of {_getTo}
+	atBlock({_p}) is false
+	Ground({_p}) is false
+	if {L2P.Speed.lastdeltaX::%{_p}%} > 0.03:
+		set {_flagged} to true if {L2P.Speed.deltaX::%{_p}%} < -0.03
+	if {L2P.Speed.lastdeltaX::%{_p}%} < -0.03:
+		set {_flagged} to true if {L2P.Speed.deltaX::%{_p}%} > 0.03
+	if {L2P.Speed.lastdeltaZ::%{_p}%} > 0.03:
+		set {_flagged} to true if {L2P.Speed.deltaZ::%{_p}%} < -0.03
+	if {L2P.Speed.lastdeltaZ::%{_p}%} < -0.03:
+		set {_flagged} to true if {L2P.Speed.deltaZ::%{_p}%} > 0.03
+	{_flagged} is true
+	alert({_p}, "Speed", "L2P-C", "Larkus") if addThreshold({_p}, "Speed (C)", 5, 15, true) is true
+
+import:
+    java.util.HashMap
+
+on join:
+    set {BoltData::%player%} to new HashMap()
+    {BoltData::%player%}.put("Player", player)
+on right click:
+	if player's held item is a sword:
+#		send "%difference between {testautoblock::%player%} and now%" to player
+		set {testautoblock::%player%} to now
+		target player is set
+		distance between player and target player <= 4
+		difference between {Packet::UseEntity::%player%} and now is more than 1 second
+		alert(player, "Aura", "C", "Larkus")
+
+on damage:
+	attacker is player
+	victim is player
+	"%damage cause%" != "projectile" or "potion" or "enderpearl"
+	attacker's gamemode is not creative
+	if difference between now and {testautoblock::%attacker%} is less than 0.04 seconds:
+		alert(attacker, "Aura", "A", "Larkus")
+		
+every 5 ticks:
+	set {Liters.Checks::*} to "Motion Freq"
+	loop {Liters.Checks::*}:
+		delete {L2P.VL.%loop-value%::*}
+		delete {L2P.Threshold.%loop-value%::*}
+on damage:
+	if difference between {testautoblock::%attacker%} and now is less than 1 second:
+		send "1 %difference between {Packet::UseEntity::%attacker%} and now%" to attacker
+		if difference between {Packet::UseEntity::%attacker%} and now is more than 1 second:
+			alert(attacker, "Aura", "B", "Larkus")
+			
+on damage of player:
+	attacker is a player
+	projectile doesn't exist
+	if {lasttogglefly::%attacker%} is not set:
+		set {lasttogglefly::%attacker%} to now
+	difference between {lasttogglefly::%attacker%} and now >= 4 seconds
+	set {_reach} to distance between attacker and victim
+	difference between y coord of victim and y coord of attacker is not above 2
+	if attacker doesn't have speed:
+		if {_reach} is greater than 3.43:
+			{Larkus::PL::%attacker's uuid%} is not attacker's location
+			add 1 to {Larkus::PLC::%attacker's uuid%}
+			set {Larkus::PL::%attacker's uuid%} to attacker's location
+			if {Larkus::PLC::%attacker's uuid%} >= 6:
+				alert(attacker, "Reach", "A", "Larkus")
+		else:
+			delete {Larkus::PLC::%attacker's uuid%}			
+
+
+on left click:
+	if {lastbreak::%player%} is not set:
+		set {lastbreak::%player%} to now
+	difference between {lastbreak::%player%} and now > 1 second
+	if target block is set:
+		if distance between target block and player < 5:
+			stop
+	target block is not wheat
+	target block is not sugar cane
+	target block is not torch
+	target block is not redstone torch
+	target block is not grass
+	target block is not lily pad
+	target block is not flower pot
+	target block is not redstone
+	add 1 to {cps::%player's uuid%}
+on break:
+	set {lastbreak::%player%} to now
+every 1 second in world "world":
+	loop all players:
+		{cps::%loop-player's uuid%} is set
+		{cps::%loop-player's uuid%} is not 0
+		if {cps::%loop-player's uuid%} >= 20:
+			difference between {lastbreak::%loop-player%} and now > 1 second
+			set {lastcps::%loop-player's uuid%} to {cps::%loop-player's uuid%}
+			alert(loop-player, "Autoclicker", "A", "Larkus")
+		if {cps::%loop-player's uuid%} = {lastcps::%loop-player's uuid%}:
+			add 1 to {clickb::%loop-player%}
+		alert(loop-player, "Autoclicker", "B", "Larkus") if {clickb::%loop-player%} = 3
+		delete {clickb::%loop-player%} if {clickb::%loop-player%} >= 3
+		clear {cps::%loop-player's uuid%}
+
+on packet:
+	broadcast "test"
+	{CancelCheck::%player%} is 1
+	if "%packet%" contains "UseEntity":
+		set {Packet::UseEntity::%player%} to now	
+	if "%packet%" contains "Flying":
+#		add 1 to {PF::%player%} if addThreshold(player, "Motion Freq", 1, 20, true) is true
+#		if {PF::%player%} >= 5:
+#			delete {PF::%player%}
+#			alert(player, "Packet", "A", "Larkus")
+		{BoltData::%player%}.put("prevGround", {BoltData::%player%}.get("Ground"))
+		{BoltData::%player%}.put("Ground", packet.b())
+		broadcast "tru3"
+		if "%packet%" contains "Position":
+			
+			set {_prevX} to {BoltData::%player%}.get("x")
+			set {_prevY} to {BoltData::%player%}.get("y")
+			set {_prevZ} to {BoltData::%player%}.get("z")
+			
+			set {_x} to packet.x
+			set {_y} to packet.y
+			set {_z} to packet.z
+			
+			set {_prevDeltaX} to {BoltData::%player%}.get("deltaX")
+			set {_prevDeltaY} to {BoltData::%player%}.get("deltaY")
+			set {_prevDeltaZ} to {BoltData::%player%}.get("deltaZ")
+			set {_prevDeltaXZ} to {BoltData::%player%}.get("deltaXZ")
+			
+			set {_deltaX} to {_x} - {_prevX}
+			set {_deltaY} to {_y} - {_prevY}
+			set {_deltaZ} to {_z} - {_prevZ}
+			set {_deltaXZ} to sqrt({_deltaX}^2 + {_deltaZ}^2)
+			
+			{BoltData::%player%}.put("prevX", {_prevX})
+			{BoltData::%player%}.put("prevY", {_prevY})
+			{BoltData::%player%}.put("prevZ", {_prevZ})
+			
+			{BoltData::%player%}.put("x", {_x})
+			{BoltData::%player%}.put("y", {_y})
+			{BoltData::%player%}.put("z", {_z})
+			
+			{BoltData::%player%}.put("prevDeltaX", {_prevDeltaX})
+			{BoltData::%player%}.put("prevDeltaY", {_prevDeltaY})
+			{BoltData::%player%}.put("prevDeltaZ", {_prevDeltaZ})
+			{BoltData::%player%}.put("prevDeltaXZ", {_prevDeltaXZ})
+			
+			{BoltData::%player%}.put("deltaX", {_deltaX})
+			{BoltData::%player%}.put("deltaY", {_deltaY})
+			{BoltData::%player%}.put("deltaZ", {_deltaZ})
+			{BoltData::%player%}.put("deltaXZ", {_deltaXZ})
+		broadcast "true2"
+		IsNormal(player) is true
+		broadcast "true"
+		SpeedC({BoltData::%player%}, packet)
+		MotionA({BoltData::%player%}, packet)
+		FlightA(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+		BadPacketsA(player, {L2P.getFrom::%player%}, {L2P.getTo::%player%})
+
+function serverGround(l: location) :: boolean:
+    remove 1 / 64 from y coord of {_l}
+    if block 0.4 meters north west of {_l} is air:
+        block 0.4 meters north east of {_l} is air
+        block 0.4 meters south west of {_l} is air
+        block 0.4 meters south east of {_l} is air
+        if mod((y coord of {_l} + (1 / 64)), 1/2) = 0:
+            remove 32 / 64 from y coord of {_l}
+            if block 0.4 meters north west of {_l} is air:
+                block 0.4 meters north east of {_l} is air
+                block 0.4 meters south west of {_l} is air
+                block 0.4 meters south east of {_l} is air
+                return false
+            return true
+        return false
+    return true
+
+function mathGround(l: location) :: boolean:
+    return true if mod(y coord of {_l}, 1 / 64) = 0
+    return false
+
+function rayTrace(l: location, ol: location) :: boolean:
+	set {_v} to vector from yaw {_l}'s yaw and pitch {_l}'s pitch
+	loop 300 times:
+		set {_length} to {_length} + 0.01
+		set standard length of {_v} to {_length}
+		set {_ray} to {_l} ~ {_v}
+		if isInHitBox({_ol}, {_ray}) = true:
+			return true
+	return false
+
+function eyeLocation(l: location) :: location:
+	add 1.62 to y coord of {_l}
+	return {_l}
+
+function viewedLocation(l: location) :: location:
+	if x coord of {_l} < 0:
+		set x coord of {_l} to ceil(x coord of {_l} * 32) / 32
+	else:
+		set x coord of {_l} to floor(x coord of {_l} * 32) / 32
+	if y coord of {_l} < 0:
+		set y coord of {_l} to ceil(y coord of {_l} * 32) / 32
+	else:
+		set y coord of {_l} to floor(y coord of {_l} * 32) / 32
+	if z coord of {_l} < 0:
+		set z coord of {_l} to ceil(z coord of {_l} * 32) / 32
+	else:
+		set z coord of {_l} to floor(z coord of {_l} * 32) / 32
+	return {_l}
+
+function getIdPlayer(n: number) :: player:
+	set {_players::*} to (all players where [player input.getEntityId() = {_n}])
+	return {_players::1}
+
+function isInHitBox(l: location, ol: location) :: boolean:
+	if x coord of {_ol} < x coord of {_l} + 0.405:
+		if x coord of {_ol} > x coord of {_l} - 0.405:
+			if z coord of {_ol} < z coord of {_l} + 0.405:
+				if z coord of {_ol} > z coord of {_l} - 0.405:
+					if y coord of {_ol} < y coord of {_l} + 1.905:
+						if y coord of {_ol} > y coord of {_l} - 0.105:
+							return true
+	return false
+
+function MotionA(data: object, packet: object):
+	if "%{_packet}%" contains "Flying":
+		set {_packet} to "Fly"
+	set {_player} to {_data}.get("Player")
+	loop blocks in radius 3 of {_player}:
+		if loop-block = water or stair or slab or lava:
+			set {MotionAStop::%{_player}%} to now
+	set {MotionAStop::%{_player}%} to now if {MotionAStop::%{_player}%} is not set
+	set {MotionAStop::%{_player}%} to now if block below {_player} is slab or stair or water or lava
+	difference between {MotionAStop::%{_player}%} and now > 1.5 seconds
+	difference between {L2P::SpeedA::LastUnderBlock::%{_player}%} and now > 1.5 seconds
+	difference between {L2P::LastDamaged::%{_player}%} and now > 1.5 seconds
+	set {_deltaY1} to {_data}.get("prevDeltaY")
+	set {_deltaY2} to {_data}.get("deltaY")
+	block at {_player} is not water
+	block below {_player} is not water or slab or stair
+	if {LCJ::%{_player}%} is not set:
+		set {LCJ::%{_player}%} to now
+	{_deltaY1} is not 0
+	{_deltaY1} is not below 0
+	set {DeltaYT::%{_player}%} to 0 if {DeltaYT::%{_player}%} is not set
+	set {DeltaYT::%{_player}%} to {_deltaY1} if {_deltaY1} > {DeltaYT::%{_player}%}
+	#broadcast "%{_DeltaY1}% %{_player}% DY"
+	#broadcast "%{DeltaYT::%{_player}%}% %{_player}% HDY"
+	if {_deltaY1} is between 0.41 and 0.43:
+		set {LCJ::%{_player}%} to now
+	if difference between {LCJ::%{_player}%} and now >= 4 seconds:
+		alert({_player}, "Motion", "A", "Larkus") if addThreshold({_player}, "Motion (ATest2)", 1, 3, true) is true
+	if {_deltaY1} >= 0.5:
+		alert({_player}, "Motion", "AA %{_deltaY1}%", "Larkus") if addThreshold({_player}, "Motion (ATest3)", 1, 3, true) is true
+
+function SpeedC(data: object, packet: object):
+	if {_data}.get("prevGround") = true: 
+		set {_1} to true
+	if {_data}.get("Ground") = true: 
+		set {_2} to true
+	if {_data}.get("prevGround") = false: 
+		set {_1} to false
+	if {_data}.get("Ground") = false: 
+		set {_2} to false
+	set {_player} to {_data}.get("Player")
+#	broadcast "%{_player}% %{_1}% %{_2}%"
+	if {L2P::LastDamaged::%{_player}%} is not set:
+		set {L2P::LastDamaged::%{_player}%} to now
+	difference between {L2P::LastDamaged::%{_player}%} and now > 2 seconds
+	if "%{_packet}%" contains "Flying":
+		if "%{_packet}%" contains "Position" or "Look":
+			if {_data}.get("SpeedC-PosssibleFalse") = false:
+				if {_data}.get("prevGround") = false:
+                    
+					set {_prevDeltaXZ} to {_data}.get("prevDeltaXZ")
+                    
+					set {_deltaXZ} to {_data}.get("deltaXZ")
+                    
+					set {_predicted} to (({_prevDeltaXZ} * 0.91) + 0.026) - {_deltaXZ}
+					if {_predicted} < 0:
+						alert({_player}, "Speed", "L2P-C", "Larkus") if addThreshold({_player}, "Speed (TestNew)", 1, 7, true) is true
+                
+                
+			else:
+				{_data}.put("SpeedC-PosssibleFalse", false)
+		else:
+			{_data}.put("SpeedC-PosssibleFalse", true)
+    
+		
+function BadPacketsA(p: player, getFrom: location, getTo: location):
+    set {_check} to "Bad Packets (A)"
+    set {_description} to "Sent move packet too fast"
+    # 1.03 Timer Detection
+    removeThreshold({_p}, {_check}, 1)
+    
+    set {L2P::BadPacketsA::packetDelay::%{_p}%} to difference between now and {L2P::BadPacketsA::lastPacketTime::%{_p}%}
+    set {L2P::BadPacketsA::lastPacketTime::%{_p}%} to now
+    stop if {L2P::BadPacketsA::packetDelay::%{_p}%} < 0.01 seconds
+    add 1 to {L2P::BadPacketsA::delayBalance::%{_p}%} if {L2P::BadPacketsA::packetDelay::%{_p}%} <= 0.048 seconds
+    remove 1 from {L2P::BadPacketsA::delayBalance::%{_p}%} if {L2P::BadPacketsA::packetDelay::%{_p}%} >= 0.052 seconds
+    set {L2P::BadPacketsA::delayBalance::%{_p}%} to 0 if {L2P::BadPacketsA::delayBalance::%{_p}%} < 0
+    set {_r} to 1 or 2
+    if {_r} = 1:
+        remove 1 from {L2P::BadPacketsA::delayBalance::%{_p}%} if {_p}'s ping >= 200
+    {L2P::BadPacketsA::delayBalance::%{_p}%} >= 8
+    set {_var} to {L2P::BadPacketsA::delayBalance::%{_p}%}
+    set {L2P::BadPacketsA::delayBalance::%{_p}%} to 0
+    set {L2P::BadPacketsA::delayFlag::%{_p}%} to difference between now and {L2P::BadPacketsA::lastFlag::%{_p}%}
+    set {L2P::BadPacketsA::lastFlag::%{_p}%} to now
+    {L2P::BadPacketsA::delayFlag::%{_p}%} < 1.5 seconds
+    
+    set {_info} to "%{L2P::BadPacketsA::packetDelay::%{_p}%}%"
+    replace all " seconds" or " second" in {_info} with ""
+    set {_info} to {_info} parsed as a number
+    set {_info} to {_info} * 1000
+    set {_predictedcheat} to (100 - {_info} * 2) + 1
+    set {_info} to "%{_info}%ms/50ms - %{_predictedcheat}%%%"
+    
+    alert({_p}, "Timer", "L2P-B", "Larkus") if addThreshold({_p}, {_check}, 70, 100, false) is true
+    #l2pDebug({_p}, {_check}, {_info})
+function angleDiff(a: number, b: number) :: number:
+    set {_dist} to abs({_a} - {_b})
+    set {_dist} to {_dist} - 360 if {_dist} > 180
+    return {_dist}
+	
+	
+on break:
+	player is not op
+	stop
+on place:
+	player is not op
+	stop
